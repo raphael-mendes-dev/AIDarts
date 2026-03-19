@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" fill="none">
+  <defs>
+    <line id="wire-spoke" x1="500" y1="464.75" x2="500" y2="123.06" />
+  </defs>
+  <g stroke="#00dcff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="500" cy="500" r="14.08" />
+    <circle cx="500" cy="500" r="35.25" />
+    <circle cx="500" cy="500" r="219.51" />
+    <circle cx="500" cy="500" r="237.25" />
+    <circle cx="500" cy="500" r="359.2" />
+    <circle cx="500" cy="500" r="376.94" />
+    <circle cx="500" cy="500" r="500" />
+    <use href="#wire-spoke" transform="rotate(9 500 500)" />
+    <use href="#wire-spoke" transform="rotate(27 500 500)" />
+    <use href="#wire-spoke" transform="rotate(45 500 500)" />
+    <use href="#wire-spoke" transform="rotate(63 500 500)" />
+    <use href="#wire-spoke" transform="rotate(81 500 500)" />
+    <use href="#wire-spoke" transform="rotate(99 500 500)" />
+    <use href="#wire-spoke" transform="rotate(117 500 500)" />
+    <use href="#wire-spoke" transform="rotate(135 500 500)" />
+    <use href="#wire-spoke" transform="rotate(153 500 500)" />
+    <use href="#wire-spoke" transform="rotate(171 500 500)" />
+    <use href="#wire-spoke" transform="rotate(189 500 500)" />
+    <use href="#wire-spoke" transform="rotate(207 500 500)" />
+    <use href="#wire-spoke" transform="rotate(225 500 500)" />
+    <use href="#wire-spoke" transform="rotate(243 500 500)" />
+    <use href="#wire-spoke" transform="rotate(261 500 500)" />
+    <use href="#wire-spoke" transform="rotate(279 500 500)" />
+    <use href="#wire-spoke" transform="rotate(297 500 500)" />
+    <use href="#wire-spoke" transform="rotate(315 500 500)" />
+    <use href="#wire-spoke" transform="rotate(333 500 500)" />
+    <use href="#wire-spoke" transform="rotate(351 500 500)" />
+  </g>
+</svg>

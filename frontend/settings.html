@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Settings — AI Dart Scorer</title>
+    <link rel="stylesheet" href="/static/css/settings.css" />
+    <link rel="icon" href="/static/icons/favicon.svg" />
+    <script src="/static/js/settings.js" defer></script>
+  </head>
+
+  <body>
+    <header class="topbar">
+      <a href="/" class="back-btn" aria-label="Back">
+        <object data="/static/icons/chevron-left.svg" type="image/svg+xml"></object>
+      </a>
+      <h1>Settings</h1>
+    </header>
+
+    <main>
+      <!-- ── Data Collection ── -->
+      <section>
+        <h2>Data Collection</h2>
+        <div class="setting-line slider">
+          <label for="toggle-dc">Enable mode on home screen</label>
+          <input type="checkbox" id="toggle-dc" />
+        </div>
+        <div class="setting-line" id="row-folder" aria-disabled="true">
+          <label>Data Folder (Chrome/Edge)</label>
+          <div>
+            <button id="btn-folder" type="button">Choose Folder</button>
+            <span id="folder-name" class="folder-name">Not set</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Cameras ── -->
+      <section>
+        <h2>Cameras</h2>
+        <div class="setting-line">
+          <label>Available devices</label>
+          <div>
+            <button id="btn-scan" type="button">Scan</button>
+            <span id="scan-status" class="folder-name">Not scanned</span>
+          </div>
+        </div>
+        <div class="cam-assign-grid">
+          <div class="cam-assign" data-slot="1">
+            <span class="cam-assign-label">Cam 1</span>
+            <select id="cam-sel-1" disabled><option value="">—</option></select>
+            <div class="cam-assign-thumb" id="cam-thumb-1"></div>
+          </div>
+          <div class="cam-assign" data-slot="2">
+            <span class="cam-assign-label">Cam 2</span>
+            <select id="cam-sel-2" disabled><option value="">—</option></select>
+            <div class="cam-assign-thumb" id="cam-thumb-2"></div>
+          </div>
+          <div class="cam-assign" data-slot="3">
+            <span class="cam-assign-label">Cam 3</span>
+            <select id="cam-sel-3" disabled><option value="">—</option></select>
+            <div class="cam-assign-thumb" id="cam-thumb-3"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Calibration ── -->
+      <section>
+        <h2>Calibration</h2>
+        <div class="cam-grid">
+          <div class="cam-card" data-cam="1">
+            <div class="cam-tile" id="tile-1">
+              <img id="img-1" alt="Cam 1" />
+              <div class="cam-overlay">CAM 1</div>
+            </div>
+            <button class="calibrate-btn" type="button" data-open-calib="1">Calibrate</button>
+          </div>
+          <div class="cam-card" data-cam="2">
+            <div class="cam-tile" id="tile-2">
+              <img id="img-2" alt="Cam 2" />
+              <div class="cam-overlay">CAM 2</div>
+            </div>
+            <button class="calibrate-btn" type="button" data-open-calib="2">Calibrate</button>
+          </div>
+          <div class="cam-card" data-cam="3">
+            <div class="cam-tile" id="tile-3">
+              <img id="img-3" alt="Cam 3" />
+              <div class="cam-overlay">CAM 3</div>
+            </div>
+            <button class="calibrate-btn" type="button" data-open-calib="3">Calibrate</button>
+          </div>
+        </div>
+
+        <div class="fusion-block">
+          <h3>Fusion Preview</h3>
+          <div class="fusion-tile" id="fusion-tile">
+            <canvas id="fusion-canvas"></canvas>
+            <div class="cam-overlay">CAM FUSION</div>
+            <div class="fusion-toggles" role="group" aria-label="Fusion camera visibility">
+              <label class="fusion-toggle"><input type="checkbox" data-fusion="1" checked /><span>CAM 1</span></label>
+              <label class="fusion-toggle"><input type="checkbox" data-fusion="2" checked /><span>CAM 2</span></label>
+              <label class="fusion-toggle"><input type="checkbox" data-fusion="3" checked /><span>CAM 3</span></label>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ── Calibration Modal ── -->
+    <div class="modal" id="calib-modal" aria-hidden="true" role="dialog" aria-modal="true">
+      <div class="modal-backdrop" id="modal-backdrop"></div>
+      <div class="modal-panel" role="document">
+        <header class="modal-header">
+          <h3 id="modal-title">Calibration</h3>
+          <div class="modal-header-actions">
+            <button class="modal-btn" id="btn-reset" type="button">Reset</button>
+            <button class="modal-btn modal-close" id="btn-close" type="button" aria-label="Close">&times;</button>
+          </div>
+        </header>
+        <div class="modal-body">
+          <div class="modal-preview cam-tile" id="modal-tile">
+            <img id="modal-img" alt="Calibration preview" />
+            <div class="wire-layer" id="wire-layer" aria-hidden="true">
+              <img
+                id="wire-svg"
+                class="wire-svg"
+                src="/static/icons/wire-overlay.svg"
+                alt=""
+                aria-hidden="true"
+              />
+              <span class="wire-handle wire-handle-nw" data-handle="nw"></span>
+              <span class="wire-handle wire-handle-ne" data-handle="ne"></span>
+              <span class="wire-handle wire-handle-se" data-handle="se"></span>
+              <span class="wire-handle wire-handle-sw" data-handle="sw"></span>
+            </div>
+            <div class="loupe" id="loupe" hidden></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
