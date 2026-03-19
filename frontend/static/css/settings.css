@@ -315,8 +315,11 @@ section h2 { margin: 0 0 14px; font-size: 1.65rem; letter-spacing: -0.01em; }
 
 .modal-panel {
   position: relative;
-  width: min(1360px, calc(100vw - 32px));
-  margin: 24px auto;
+  display: flex;
+  flex-direction: column;
+  width: min(1600px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  margin: 16px auto;
   background: rgba(18, 18, 18, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 16px;
@@ -343,19 +346,33 @@ section h2 { margin: 0 0 14px; font-size: 1.65rem; letter-spacing: -0.01em; }
 .modal-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .modal-close { width: 36px; padding: 0; font-size: 20px; line-height: 1; }
 
-.modal-body { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.modal-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+}
 
 /* ── Modal preview tile ── */
 
 .modal-preview {
+  position: relative;
   background: #000; border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  aspect-ratio: 16 / 9;
-  width: min(1280px, 100%);
-  margin: 0 auto; align-self: center;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
-.modal-preview img { width: 100%; height: 100%; object-fit: contain; display: none; }
+.modal-preview img {
+  width: 100%; height: 100%;
+  object-fit: contain;
+  display: none;
+}
+
 .modal-preview.is-live img { display: block; }
 
 /* ── Wire overlay layer ── */
@@ -385,7 +402,7 @@ section h2 { margin: 0 0 14px; font-size: 1.65rem; letter-spacing: -0.01em; }
   border: 1px solid rgba(0, 0, 0, 0.85);
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55);
   pointer-events: auto; touch-action: none; user-select: none;
-  transform: translate(-50%, -50%); cursor: grab;
+  transform: translate(-50%, -50%); cursor: crosshair;
   transition: transform 0.1s, background 0.12s, border-color 0.12s, opacity 0.12s;
 }
 
@@ -400,34 +417,34 @@ section h2 { margin: 0 0 14px; font-size: 1.65rem; letter-spacing: -0.01em; }
 
 .wire-handle.is-active {
   background: #ffd45b; border-color: rgba(22, 22, 22, 0.95);
-  transform: translate(-50%, -50%) scale(1.18); cursor: grabbing;
+  transform: translate(-50%, -50%) scale(1.18); cursor: crosshair;
 }
 
 .wire-layer.is-dragging .wire-handle:not(.is-active) { opacity: 0.82; }
 
-/* ── Loupe ── */
 
-.loupe {
-  position: absolute;
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.5);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 0 16px 4px rgba(0, 0, 0, 0.4);
-  pointer-events: none;
-  z-index: 10;
-  overflow: hidden;
-  background: #000;
-  transform: translate(-50%, -50%);
+.modal-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 4px;
 }
 
-.loupe[hidden] { display: none; }
-
-.loupe > img {
-  position: absolute;
-  display: block;
-  pointer-events: none;
+.modal-action-btn {
+  width: 56px; height: 56px;
+  display: inline-flex;
+  align-items: center; justify-content: center;
+  background: var(--btn-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  color: inherit; cursor: pointer;
+  transition: background 0.16s, border-color 0.16s, transform 0.12s;
 }
+
+.modal-action-btn object { width: 32px; height: 32px; pointer-events: none; }
+.modal-action-btn:hover { background: var(--btn-bg-hover); border-color: rgba(255, 255, 255, 0.2); }
+.modal-action-btn:active { transform: translateY(1px); }
+.modal-action-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
 /* ── Animations ── */
 

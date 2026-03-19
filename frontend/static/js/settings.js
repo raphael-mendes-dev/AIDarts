@@ -121,6 +121,7 @@
   let storedH   = lsGet(LS_H, {});     // slot → cumulative 3×3 homography matrix
   let fusionVis = { 1: true, 2: true, 3: true };
   let previews  = {};                   // slot → { url, img }
+  let originals = {};                   // slot → { url, img } — un-warped snapshots
   let fusionVer = 0;
 
   let resetAbort = null;
@@ -151,7 +152,6 @@
   const modalImg   = $("#modal-img");
   const wireLayer  = $("#wire-layer");
   const wireSvg    = $("#wire-svg");
-  const loupeEl    = $("#loupe");
   const fusionTile = $("#fusion-tile");
   const fusionCvs  = $("#fusion-canvas");
 
@@ -212,15 +212,11 @@
         const url = URL.createObjectURL(blob);
         loadImageFromUrl(url, img => {
           tile.classList.remove("is-busy"); tile.classList.add("is-live");
+          // Always keep the original un-warped snapshot
+          originals[slot] = { url, img };
           const H = storedH[slot];
           if (H) {
-            const warpedUrl = warpWithH(img, H);
-            loadImageFromUrl(warpedUrl, warpedImg => {
-              URL.revokeObjectURL(url);
-              setPreviewEverywhere(slot, warpedUrl, warpedImg);
-              scheduleFusion();
-              resolve();
-            });
+            applyTotalH(slot, resolve);
           } else {
             setPreviewEverywhere(slot, url, img);
             scheduleFusion();
@@ -229,6 +225,19 @@
         });
       }))
       .catch(() => { tile.classList.remove("is-busy"); });
+  }
+
+  // Warp the ORIGINAL image with the cumulative H — never warp an already-warped image
+  function applyTotalH(slot, cb) {
+    const orig = originals[slot];
+    const H = storedH[slot];
+    if (!orig || !H) { if (cb) cb(); return; }
+    const warpedUrl = warpWithH(orig.img, H);
+    loadImageFromUrl(warpedUrl, warpedImg => {
+      setPreviewEverywhere(slot, warpedUrl, warpedImg);
+      scheduleFusion();
+      if (cb) cb();
+    });
   }
 
   function setPreviewEverywhere(slot, url, img) {
@@ -283,6 +292,7 @@
     $(`#img-${slot}`).removeAttribute("src");
     thumbEls[slot-1].innerHTML = "";
     delete previews[slot];
+    delete originals[slot];
     scheduleFusion();
   }
 
@@ -490,6 +500,49 @@
 
   modalImg.addEventListener("load", () => { if (modal.open) requestAnimationFrame(renderWire); });
 
+  /* ── Rotation (18° steps) — warp image, reset handles ── */
+
+  function buildRotationH(degrees, img) {
+    // Rotation in image-norm coords (0-1 × 0-1). Since x spans w pixels
+    // and y spans h pixels, we must go through pixel space to rotate
+    // without distortion: norm→pixel→center→rotate→uncenter→norm.
+    const w = img.naturalWidth, h = img.naturalHeight;
+    const rad = degrees * Math.PI / 180;
+    const cos = Math.cos(rad), sin = Math.sin(rad);
+    return normH([
+      [cos,          -sin * h / w,  0.5 - cos * 0.5 + sin * h / (2 * w)],
+      [sin * w / h,   cos,          0.5 - sin * w / (2 * h) - cos * 0.5],
+      [0,             0,            1],
+    ]);
+  }
+
+  function applyRotation(degrees) {
+    const slot = modal.slot;
+    if (!slot || !originals[slot] || modal.dragging) return;
+
+    const Hrot = buildRotationH(degrees, originals[slot].img);
+    if (!Hrot) return;
+
+    const prev = storedH[slot] || [[1,0,0],[0,1,0],[0,0,1]];
+    const Htotal = normH(mulH(prev, Hrot));
+    if (!Htotal) return;
+
+    storedH[slot] = Htotal;
+    lsSet(LS_H, storedH);
+
+    applyTotalH(slot, () => {
+      modalImg.src = previews[slot].url;
+      const L = getLayout();
+      if (L) modal.anchors = defaultAnchors(L);
+      calibSave[slot] = cloneAnchors(modal.anchors);
+      lsSet(LS_CAL, calibSave);
+      renderWire();
+    });
+  }
+
+  $("#btn-rotate-left").addEventListener("click", () => applyRotation(18));
+  $("#btn-rotate-right").addEventListener("click", () => applyRotation(-18));
+
   /* ── Handle dragging ── */
 
   for (const key of HANDLE_KEYS) {
@@ -506,7 +559,6 @@
       try { el.setPointerCapture(e.pointerId); } catch {}
       applyPointer(e, L);
       renderWire();
-      showLoupe(e);
     });
   }
 
@@ -517,7 +569,6 @@
     if (!L) return;
     applyPointer(e, L);
     renderWire();
-    showLoupe(e);
   });
 
   window.addEventListener("pointerup",     e => endDrag(e, false));
@@ -551,7 +602,6 @@
     modal.dragging = "";
     modal.pointerId = null;
     modal.handleEl = null;
-    hideLoupe();
     renderWire();
 
     if (!cancelled && modal.slot && modal.anchors) {
@@ -582,77 +632,22 @@
     const Hinc = h4pt(dst, src);
     if (!Hinc) return;
 
-    // Compose: H is inverse mapping (output→source), so prev(Hinc(p))
+    // Compose with cumulative H
     const prev = storedH[slot] || [[1,0,0],[0,1,0],[0,0,1]];
     const Htotal = normH(mulH(prev, Hinc));
     if (!Htotal) return;
 
-    // Warp the CURRENT displayed image with the incremental H
-    const warpedUrl = warpWithH(previews[slot].img, Hinc);
-
-    // Persist cumulative homography
+    // Persist and warp from ORIGINAL (never from already-warped image)
     storedH[slot] = Htotal;
     lsSet(LS_H, storedH);
 
-    // Update image everywhere
-    loadImageFromUrl(warpedUrl, newImg => {
-      setPreviewEverywhere(slot, warpedUrl, newImg);
-      modalImg.src = warpedUrl;
-
-      // Reset handles to default (perfect circle)
+    applyTotalH(slot, () => {
+      modalImg.src = previews[slot].url;
       modal.anchors = defaultAnchors(getLayout() || L);
       calibSave[slot] = cloneAnchors(modal.anchors);
       lsSet(LS_CAL, calibSave);
       renderWire();
-      scheduleFusion();
     });
-  }
-
-  /* ── Loupe — zoomed circle centered on cursor ── */
-
-  const LOUPE_SIZE = 120;
-  const LOUPE_ZOOM = 4;
-  let loupeImg = null;
-
-  function showLoupe(e) {
-    const tileR = modalTile.getBoundingClientRect();
-    const px = e.clientX - tileR.left;
-    const py = e.clientY - tileR.top;
-
-    // Position loupe centered on cursor within the tile
-    loupeEl.style.left = px + "px";
-    loupeEl.style.top  = py + "px";
-
-    // Create or reuse the zoomed image inside the loupe
-    if (!loupeImg) {
-      loupeImg = document.createElement("img");
-      loupeImg.src = modalImg.src;
-      loupeEl.innerHTML = "";
-      loupeEl.appendChild(loupeImg);
-    }
-
-    // Scale image so it appears LOUPE_ZOOM× zoomed, and offset
-    // so the cursor point is centered in the loupe circle.
-    const imgR = modalImg.getBoundingClientRect();
-    const zw = imgR.width * LOUPE_ZOOM;
-    const zh = imgR.height * LOUPE_ZOOM;
-    const imgX = e.clientX - imgR.left;
-    const imgY = e.clientY - imgR.top;
-    const offX = LOUPE_SIZE / 2 - imgX * LOUPE_ZOOM;
-    const offY = LOUPE_SIZE / 2 - imgY * LOUPE_ZOOM;
-
-    loupeImg.style.width  = zw + "px";
-    loupeImg.style.height = zh + "px";
-    loupeImg.style.left   = offX + "px";
-    loupeImg.style.top    = offY + "px";
-
-    loupeEl.hidden = false;
-  }
-
-  function hideLoupe() {
-    loupeEl.hidden = true;
-    loupeImg = null;
-    loupeEl.innerHTML = "";
   }
 
   window.addEventListener("resize", () => { if (modal.open) renderWire(); scheduleFusion(); });
