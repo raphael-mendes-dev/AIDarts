@@ -95,22 +95,27 @@ def _frame_to_b64jpg(frame: np.ndarray) -> str:
 
 
 def _run_detection(processed: list[np.ndarray], t_start: float, capture_ms: float = 0) -> dict:
-    """Shared detection pipeline: BGR frames → inference → result dict."""
+    """Shared detection pipeline: BGR frames → inference → result dict with scores."""
+    from backend.scorer import score_dart
+
     pil_images = [Image.fromarray(cv2.cvtColor(f, cv2.COLOR_BGR2RGB)) for f in processed]
     count, kps, inference_ms = _detector.predict(pil_images)
     t_end = time.perf_counter()
 
+    keypoints = []
+    for i, (xn, yn, conf) in enumerate(kps):
+        dart_score = score_dart(float(xn), float(yn))
+        keypoints.append({
+            "dart": i + 1,
+            "x_norm": round(float(xn), 4),
+            "y_norm": round(float(yn), 4),
+            "confidence": round(float(conf), 4),
+            **dart_score,
+        })
+
     return {
         "count": count,
-        "keypoints": [
-            {
-                "dart": i + 1,
-                "x_norm": round(float(xn), 4),
-                "y_norm": round(float(yn), 4),
-                "confidence": round(float(conf), 4),
-            }
-            for i, (xn, yn, conf) in enumerate(kps)
-        ],
+        "keypoints": keypoints,
         "time_ms": round(inference_ms, 1),
         "total_ms": round((t_end - t_start) * 1000, 1),
         "capture_ms": round(capture_ms, 1),
