@@ -49,13 +49,13 @@ function updateLink() {
   const btn = selected.player();
   if (!card || !btn) return;
   const mode = card.dataset.mode;
-  const checkin = ($(`input[name="checkin-${mode}"]:checked`) || {}).value || "straight";
-  const checkout = ($(`input[name="checkout-${mode}"]:checked`) || {}).value || "straight";
+  const target = ($('input[name="target"]:checked') || {}).value || "501";
+  const checkout = ($('input[name="checkout"]:checked') || {}).value || "single";
   const params = new URLSearchParams({
     mode,
+    target,
+    checkout,
     players: btn.value,
-    check_in: checkin === "straight" ? "straight_in" : checkin + "_in",
-    check_out: checkout === "straight" ? "straight_out" : checkout + "_out",
   });
   startLink.href = "/game?" + params;
 }
