@@ -38,3 +38,8 @@ async def settings():
 @app.get("/test")
 async def test():
     return FileResponse(FRONTEND / "test.html")
+
+
+@app.get("/game")
+async def game():
+    return FileResponse(FRONTEND / "game.html")

@@ -1,0 +1,7 @@
+body { padding: 20px 32px 64px; }
+
+main { display: flex; flex-direction: column; gap: 20px; }
+
+@media (max-width: 960px) {
+  body { padding: 16px 14px 48px; }
+}
