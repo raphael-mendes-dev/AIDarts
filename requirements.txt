@@ -5,4 +5,3 @@ onnxruntime>=1.17
 numpy
 Pillow
 scipy
-python-multipart

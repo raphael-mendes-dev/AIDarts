@@ -30,10 +30,6 @@ export function loadImg(url) {
   });
 }
 
-export function canvasToBlob(cvs) {
-  return new Promise(resolve => cvs.toBlob(resolve, "image/png"));
-}
-
 /**
  * Bilinear homography warp. Returns a canvas (caller can .toDataURL() if needed).
  * Pre-fills with opaque black so unmapped pixels match training data.
@@ -80,21 +76,3 @@ export function warpWithH(img, H) {
   return outCvs;
 }
 
-/** Crop to centered square with circular board mask (matches training data). */
-export function squareCropWithMask(srcCvs) {
-  const w = srcCvs.width, h = srcCvs.height;
-  const sz = Math.min(w, h);
-  const sx = (w - sz) / 2, sy = (h - sz) / 2;
-  const out = document.createElement("canvas");
-  out.width = sz; out.height = sz;
-  const ctx = out.getContext("2d");
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, sz, sz);
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(sz / 2, sz / 2, sz / 2, 0, Math.PI * 2);
-  ctx.clip();
-  ctx.drawImage(srcCvs, sx, sy, sz, sz, 0, 0, sz, sz);
-  ctx.restore();
-  return out;
-}
