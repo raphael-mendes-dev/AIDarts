@@ -1,7 +1,190 @@
 body { padding: 20px 32px 64px; }
 
-main { display: flex; flex-direction: column; gap: 20px; }
+main { display: flex; flex-direction: column; gap: 16px; }
+
+/* Scoreboard */
+
+.scoreboard {
+  display: flex; gap: 8px; width: 100%;
+}
+
+.player-card {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 12px 8px;
+  background: var(--btn-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  transition: border-color 0.16s, box-shadow 0.16s;
+}
+
+.player-card.is-active {
+  border-color: var(--sel-border);
+  box-shadow: 0 0 16px 4px rgba(47, 191, 113, 0.2);
+}
+
+.player-card.is-bust {
+  border-color: #e74c3c;
+  box-shadow: 0 0 16px 4px rgba(231, 76, 60, 0.2);
+}
+
+.player-name {
+  font-size: var(--font-xs); color: var(--text-muted);
+  font-weight: 650; margin-bottom: 4px;
+}
+
+.player-score {
+  font-size: 2rem; font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.player-card.is-active .player-score { color: var(--accent); }
+.player-card.is-bust .player-score { color: #e74c3c; }
+
+/* Board section */
+
+.board-section { width: 100%; }
+
+.board-wrap {
+  position: relative;
+  width: 100%; max-width: 500px;
+  margin: 0 auto;
+  aspect-ratio: 1;
+}
+
+.board-img {
+  width: 100%; height: 100%;
+  display: block; border-radius: 50%;
+}
+
+.board-canvas {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+}
+
+/* Turn panel */
+
+.turn-panel {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+}
+
+.turn-darts {
+  display: flex; gap: 8px; flex: 1;
+}
+
+.dart-slot {
+  flex: 1;
+  text-align: center;
+  padding: 8px 4px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-weight: 650; font-size: var(--font-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.dart-slot.is-scored {
+  color: var(--text);
+  border-color: var(--sel-border);
+  background: rgba(47, 191, 113, 0.1);
+}
+
+.dart-slot.is-miss {
+  color: #e74c3c;
+  border-color: rgba(231, 76, 60, 0.3);
+  background: rgba(231, 76, 60, 0.08);
+}
+
+.turn-total {
+  display: flex; flex-direction: column; align-items: center;
+  min-width: 60px;
+  font-weight: 650;
+}
+
+.turn-total span:first-child {
+  font-size: var(--font-xs); color: var(--text-muted);
+}
+
+.turn-total span:last-child {
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Status / actions */
+
+.status-panel {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+
+.status-text {
+  margin: 0;
+  font-size: var(--font-sm); color: var(--text-muted);
+  text-align: center;
+}
+
+.action-row {
+  display: flex; gap: 8px; width: 100%; max-width: 420px;
+}
+
+.action-btn {
+  flex: 1; height: 44px;
+  background: var(--btn-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  font-family: inherit; font-size: var(--font-sm); font-weight: 650;
+  color: var(--text); cursor: pointer;
+  transition: background 0.16s, border-color 0.16s;
+}
+
+.action-btn:hover { background: var(--btn-bg-hover); border-color: rgba(255, 255, 255, 0.2); }
+.action-btn:disabled { opacity: 0.4; cursor: default; pointer-events: none; }
+
+.action-btn-primary {
+  background: rgba(47, 191, 113, 0.15);
+  border-color: var(--sel-border);
+}
+
+.action-btn-primary:hover {
+  background: rgba(47, 191, 113, 0.25);
+}
+
+/* Win overlay */
+
+.win-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+}
+
+.win-overlay[hidden] { display: none; }
+
+.win-content {
+  display: flex; flex-direction: column; align-items: center; gap: 20px;
+  padding: 40px 48px;
+  background: rgba(18, 18, 18, 0.95);
+  border: 1px solid var(--sel-border);
+  border-radius: 20px;
+  box-shadow: 0 0 40px rgba(47, 191, 113, 0.3);
+}
+
+.win-content h2 { margin: 0; font-size: 1.8rem; color: var(--accent); }
+
+.win-content .action-btn-primary {
+  width: 200px;
+}
+
+/* Responsive */
 
 @media (max-width: 960px) {
   body { padding: 16px 14px 48px; }
+  .player-score { font-size: 1.5rem; }
+  .board-wrap { max-width: 100%; }
 }

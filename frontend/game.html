@@ -19,7 +19,47 @@
     </header>
 
     <main>
-      <p id="game-info">Loading...</p>
+      <!-- Player scoreboard -->
+      <section class="scoreboard" id="scoreboard"></section>
+
+      <!-- Dartboard reference with dart markers -->
+      <section class="board-section">
+        <div class="board-wrap">
+          <img src="/static/assets/reference.png" alt="Dartboard" class="board-img" />
+          <canvas id="board-canvas" class="board-canvas"></canvas>
+        </div>
+      </section>
+
+      <!-- Current turn darts -->
+      <section class="turn-panel">
+        <div class="turn-darts" id="turn-darts">
+          <div class="dart-slot" id="dart-1">—</div>
+          <div class="dart-slot" id="dart-2">—</div>
+          <div class="dart-slot" id="dart-3">—</div>
+        </div>
+        <div class="turn-total">
+          <span>Turn:</span>
+          <span id="turn-total">0</span>
+        </div>
+      </section>
+
+      <!-- Status / actions -->
+      <section class="status-panel">
+        <p class="status-text" id="status-text">Throw your darts...</p>
+        <div class="action-row">
+          <button class="action-btn" id="btn-undo" disabled>Undo</button>
+          <button class="action-btn" id="btn-miss">Miss</button>
+          <button class="action-btn action-btn-primary" id="btn-next" disabled>Next Player</button>
+        </div>
+      </section>
+
+      <!-- Win overlay -->
+      <div class="win-overlay" id="win-overlay" hidden>
+        <div class="win-content">
+          <h2 id="win-message">Player 1 wins!</h2>
+          <button class="action-btn action-btn-primary" id="btn-restart">New Game</button>
+        </div>
+      </div>
     </main>
   </body>
 </html>
