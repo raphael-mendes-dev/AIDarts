@@ -4,19 +4,52 @@ const COLORS = ["#ff3232", "#32c832", "#329aff"];
 const KP_ARM = 10;
 const KP_RADIUS = 6;
 const KP_DOT = 2;
+const AUTO_POLL_MS = 250;
 
 const cameras = lsGet(LS.CAMS, { 1: "", 2: "", 3: "" });
+const homographies = lsGet(LS.H, {});
+
+/* ── Start background frame grabber, stop on page unload ── */
+
+function buildCameraBody() {
+  const body = {};
+  for (const s of ["1", "2", "3"]) {
+    if (cameras[s] !== "") body[s] = Number(cameras[s]);
+  }
+  return body;
+}
+
+function buildHomographies() {
+  const h = {};
+  for (const s of ["1", "2", "3"]) {
+    if (homographies[s]) h[s] = homographies[s];
+  }
+  return h;
+}
+
+fetch("/api/grabber/start", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ cameras: buildCameraBody() }),
+}).catch(e => console.warn("Failed to start grabber:", e));
+
+window.addEventListener("beforeunload", () => {
+  navigator.sendBeacon("/api/grabber/stop");
+});
+
+/* ── DOM refs ── */
 
 const fusionTile = $("#fusion-tile");
 const fusionCvs = $("#fusion-canvas");
 const statusEl = $("#status-overlay");
 const btnDetect = $("#btn-detect");
 const btnDownload = $("#btn-download");
+const toggleAuto = $("#toggle-auto");
 const infoCount = $("#info-count");
 const infoTime = $("#info-time");
 const kpList = $("#kp-list");
 
-/* ── Render fusion blend with keypoints from Image elements ── */
+/* ── Render fusion blend with keypoints ── */
 
 function renderFusion(imgs, keypoints) {
   const cw = Math.max(1, fusionTile.clientWidth);
@@ -72,6 +105,20 @@ function renderFusion(imgs, keypoints) {
   }
 }
 
+/* ── Display result ── */
+
+let lastB64Images = null;
+
+async function displayResult(result) {
+  const imgs = await Promise.all(
+    result.images.map(b64 => loadImg("data:image/jpeg;base64," + b64))
+  );
+  lastB64Images = result.images;
+  btnDownload.disabled = false;
+  renderFusion(imgs, result.keypoints);
+  updateInfo(result);
+}
+
 function updateInfo(result) {
   if (!result) { infoCount.textContent = "—"; infoTime.textContent = "—"; kpList.innerHTML = ""; return; }
   infoCount.textContent = result.count;
@@ -89,10 +136,6 @@ function updateInfo(result) {
   }
 }
 
-/* ── Download: fetch the last images from result ── */
-
-let lastB64Images = null;
-
 function downloadImages() {
   if (!lastB64Images) return;
   for (let i = 0; i < lastB64Images.length; i++) {
@@ -103,14 +146,12 @@ function downloadImages() {
   }
 }
 
-/* ── Detect flow ── */
+/* ── Manual detect ── */
 
 let busy = false;
 
 async function detect() {
   if (busy) return;
-  const homographies = lsGet(LS.H, {});
-
   for (const s of [1, 2, 3]) {
     if (cameras[s] === "") { alert(`Camera ${s} is not assigned. Go to Settings first.`); return; }
   }
@@ -121,32 +162,13 @@ async function detect() {
   updateInfo(null);
 
   try {
-    const body = {
-      cameras: { "1": Number(cameras[1]), "2": Number(cameras[2]), "3": Number(cameras[3]) },
-      homographies: {},
-    };
-    for (const s of ["1", "2", "3"]) {
-      if (homographies[s]) body.homographies[s] = homographies[s];
-    }
-
     const res = await fetch("/api/detect", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ cameras: buildCameraBody(), homographies: buildHomographies() }),
     });
     if (!res.ok) throw new Error(`Detection failed: ${res.status}`);
-    const result = await res.json();
-
-    // Decode base64 images for fusion display
-    const imgs = await Promise.all(
-      result.images.map(b64 => loadImg("data:image/jpeg;base64," + b64))
-    );
-
-    lastB64Images = result.images;
-    btnDownload.disabled = false;
-
-    renderFusion(imgs, result.keypoints);
-    updateInfo(result);
+    await displayResult(await res.json());
   } catch (err) {
     console.error("Detection error:", err);
     infoCount.textContent = "Error";
@@ -158,8 +180,57 @@ async function detect() {
   }
 }
 
+/* ── Auto-detect: poll for results from background change detection ── */
+
+let autoPolling = null;
+let lastResultId = 0;
+
+function startAutoPolling() {
+  if (autoPolling) return;
+  lastResultId = 0;
+  autoPolling = setInterval(pollAutoResult, AUTO_POLL_MS);
+}
+
+function stopAutoPolling() {
+  if (autoPolling) { clearInterval(autoPolling); autoPolling = null; }
+}
+
+async function pollAutoResult() {
+  try {
+    const res = await fetch(`/api/grabber/result?after=${lastResultId}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.result && data.id > lastResultId) {
+      lastResultId = data.id;
+      await displayResult(data.result);
+    }
+  } catch { /* ignore poll errors */ }
+}
+
+async function setAutoDetect(enabled) {
+  try {
+    await fetch("/api/grabber/auto", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled, homographies: buildHomographies() }),
+    });
+    if (enabled) {
+      startAutoPolling();
+    } else {
+      stopAutoPolling();
+    }
+  } catch (e) {
+    console.warn("Failed to toggle auto-detect:", e);
+    toggleAuto.checked = false;
+  }
+}
+
+/* ── Event bindings ── */
+
 btnDetect.addEventListener("click", detect);
 btnDownload.addEventListener("click", downloadImages);
+toggleAuto.addEventListener("change", () => setAutoDetect(toggleAuto.checked));
+
 window.addEventListener("keydown", e => {
   if (e.code === "Space" && !e.repeat && document.activeElement?.tagName !== "BUTTON") {
     e.preventDefault();

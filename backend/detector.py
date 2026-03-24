@@ -79,7 +79,11 @@ class DartDetector:
 
         self.session = ort.InferenceSession(str(model_path.resolve()), sess_options=opts)
         input_shape = self.session.get_inputs()[0].shape
-        self.img_size = input_shape[2] if isinstance(input_shape[2], int) else 192
+        if isinstance(input_shape[2], int):
+            self.img_size = input_shape[2]
+        else:
+            self.img_size = 192
+            log.warning("Model has dynamic input shape %s, defaulting to %d", input_shape, self.img_size)
 
     def _build_input(self, pil_images: List[Image.Image]) -> np.ndarray:
         """Convert 3 PIL images into a normalized (1, 9, H, W) float32 tensor.
@@ -131,6 +135,9 @@ class DartDetector:
     ) -> Tuple[int, List[Keypoint], float]:
         """Run dart detection on 3 camera images.
 
+        Args:
+            pil_images: Exactly 3 PIL images (cam1, cam2, cam3).
+
         Pipeline:
             1. Preprocess: resize, normalize, concatenate into 9-channel tensor
             2. ONNX inference: produces count logits + heatmap
@@ -150,6 +157,8 @@ class DartDetector:
                 elapsed_ms: ONNX inference wall time in milliseconds
                             (excludes pre/post-processing).
         """
+        if len(pil_images) != 3:
+            raise ValueError(f"Expected exactly 3 images, got {len(pil_images)}")
         x = self._build_input(pil_images)
 
         t0 = time.perf_counter()

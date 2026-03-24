@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.api import router as api_router
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger(__name__)
 
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend"

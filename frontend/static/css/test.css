@@ -50,6 +50,26 @@ main { display: flex; flex-direction: column; align-items: center; gap: 20px; }
 
 .kp-coords { color: var(--text-muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
 
+/* Auto toggle */
+
+.auto-row { width: 100%; max-width: 420px; }
+
+.auto-toggle {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 8px 16px; border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: var(--btn-bg); cursor: pointer;
+  font-size: var(--font-sm); color: var(--text-muted);
+  transition: border-color 0.16s, background 0.16s, color 0.16s;
+}
+
+.auto-toggle input { margin: 0; accent-color: var(--accent); }
+
+.auto-toggle:has(input:checked) {
+  border-color: var(--sel-border); color: var(--text);
+  background: rgba(47, 191, 113, 0.12);
+}
+
 /* Action row */
 
 .action-row { display: flex; gap: 12px; width: 100%; max-width: 420px; }

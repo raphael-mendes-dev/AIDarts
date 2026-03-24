@@ -1,4 +1,4 @@
-import { $, $$, lsGet, lsSet, loadImg, warpWithH as warpCanvas, EPS, LS } from "./common.js";
+import { $, $$, lsGet, lsSet, loadImg, warpWithH, EPS, LS } from "./common.js";
 
 const HANDLE_KEYS = ["nw", "ne", "se", "sw"];
 const WIRE_SRC = {
@@ -21,9 +21,8 @@ function cloneAnchors(a) {
   return o;
 }
 
-/* Homography: warp returns dataURL (settings needs it for <img> src) */
-function warpWithH(img, H) {
-  return warpCanvas(img, H).toDataURL("image/png");
+function warpToDataUrl(img, H) {
+  return warpWithH(img, H).toDataURL("image/png");
 }
 
 /* ── Linear algebra ── */
@@ -138,7 +137,7 @@ function revokeOriginal(slot) {
 
 /* ── 1. Data Collection ── */
 
-toggleDC.checked = localStorage.getItem(LS.DC) !== "false";
+toggleDC.checked = lsGet(LS.DC, true);
 syncDC();
 toggleDC.addEventListener("change", () => { lsSet(LS.DC, toggleDC.checked); syncDC(); });
 function syncDC() { rowFolder.setAttribute("aria-disabled", toggleDC.checked ? "false" : "true"); }
@@ -214,7 +213,7 @@ function applyTotalH(slot, cb) {
   const orig = originals[slot];
   const H = storedH[slot];
   if (!orig || !H) { if (cb) cb(); return; }
-  const warpedUrl = warpWithH(orig.img, H);
+  const warpedUrl = warpToDataUrl(orig.img, H);
   loadImg(warpedUrl).then(warpedImg => {
     setPreviewEverywhere(slot, warpedUrl, warpedImg);
     scheduleFusion();
