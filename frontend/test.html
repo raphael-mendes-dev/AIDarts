@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Test Detection — AI Dart Scorer</title>
+    <link rel="stylesheet" href="/static/css/test.css" />
+    <link rel="icon" href="/static/icons/favicon.svg" />
+    <script src="/static/js/test.js" defer></script>
+  </head>
+
+  <body>
+    <header class="topbar">
+      <a href="/" class="back-btn" aria-label="Back">
+        <object data="/static/icons/chevron-left.svg" type="image/svg+xml"></object>
+      </a>
+      <h1>Test Detection</h1>
+    </header>
+
+    <main>
+      <section class="fusion-section">
+        <div class="fusion-tile" id="fusion-tile">
+          <canvas id="fusion-canvas"></canvas>
+          <div class="cam-overlay">FUSION</div>
+          <div class="status-overlay" id="status-overlay"></div>
+        </div>
+      </section>
+
+      <section class="info-panel" id="info-panel">
+        <div class="info-row">
+          <span class="info-label">Darts</span>
+          <span class="info-value" id="info-count">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Inference</span>
+          <span class="info-value" id="info-time">—</span>
+        </div>
+        <div id="kp-list"></div>
+      </section>
+
+      <div class="action-row">
+        <button class="detect-btn" id="btn-detect" type="button">Detect</button>
+        <button class="download-btn" id="btn-download" type="button" disabled>Download views</button>
+      </div>
+      <p class="hint">or press <kbd>Space</kbd></p>
+    </main>
+  </body>
+</html>

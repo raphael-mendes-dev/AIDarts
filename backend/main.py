@@ -21,3 +21,8 @@ async def home():
 @app.get("/settings")
 async def settings():
     return FileResponse(FRONTEND / "settings.html")
+
+
+@app.get("/test")
+async def test():
+    return FileResponse(FRONTEND / "test.html")
