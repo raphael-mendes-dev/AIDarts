@@ -24,6 +24,7 @@ const state = {
   turnStartScore: 0,    // score at start of current turn (for bust revert)
   gameOver: false,
   busted: false,
+  history: [],          // [{player, darts: [{label, score}...], total, remaining, busted}]
 };
 
 function initGame() {
@@ -33,9 +34,11 @@ function initGame() {
   state.turnStartScore = config.target;
   state.gameOver = false;
   state.busted = false;
+  state.history = [];
   renderScoreboard();
   renderTurn();
   renderBoard();
+  renderHistory();
   setStatus("Throw your darts...");
   $("#win-overlay").hidden = true;
   btnUndo.disabled = true;
@@ -52,6 +55,7 @@ const boardCanvas = $("#board-canvas");
 const btnUndo = $("#btn-undo");
 const btnMiss = $("#btn-miss");
 const btnNext = $("#btn-next");
+const historyEl = $("#history");
 
 /* ── Render scoreboard ── */
 
@@ -127,6 +131,43 @@ function renderBoard() {
   }
 }
 
+/* ── Render history ── */
+
+function renderHistory() {
+  historyEl.innerHTML = "";
+  if (state.history.length === 0) return;
+
+  const table = document.createElement("table");
+  table.className = "history-table";
+  table.innerHTML = `<thead><tr>
+    <th>#</th><th>Player</th><th>D1</th><th>D2</th><th>D3</th><th>Turn</th><th>Left</th>
+  </tr></thead>`;
+  const tbody = document.createElement("tbody");
+
+  for (let i = 0; i < state.history.length; i++) {
+    const h = state.history[i];
+    const tr = document.createElement("tr");
+    if (h.busted) tr.className = "is-bust";
+
+    const darts = [0, 1, 2].map(j => h.darts[j]
+      ? `<td class="${h.darts[j].score === 0 ? 'is-miss' : ''}">${h.darts[j].label}</td>`
+      : "<td>—</td>"
+    ).join("");
+
+    tr.innerHTML =
+      `<td>${i + 1}</td>` +
+      `<td>P${h.player + 1}</td>` +
+      darts +
+      `<td class="turn-col">${h.busted ? "BUST" : h.total}</td>` +
+      `<td>${h.remaining}</td>`;
+    tbody.appendChild(tr);
+  }
+
+  table.appendChild(tbody);
+  historyEl.appendChild(table);
+  historyEl.scrollTop = historyEl.scrollHeight;
+}
+
 /* ── Score application ── */
 
 function applyDart(dart) {
@@ -169,8 +210,20 @@ function applyDart(dart) {
   }
 }
 
+function recordTurn(busted = false) {
+  state.history.push({
+    player: state.currentPlayer,
+    darts: state.turnDarts.map(d => ({ label: d.label, score: d.score })),
+    total: busted ? 0 : state.turnDarts.reduce((s, d) => s + d.score, 0),
+    remaining: state.scores[state.currentPlayer],
+    busted,
+  });
+  renderHistory();
+}
+
 function bust() {
   state.busted = true;
+  recordTurn(true);
   state.scores[state.currentPlayer] = state.turnStartScore;
   setStatus("BUST! Score reverted.");
   highlightBust();
@@ -192,6 +245,7 @@ function highlightBust() {
 }
 
 function win(playerIdx) {
+  recordTurn();
   state.gameOver = true;
   $("#win-message").textContent = `Player ${playerIdx + 1} wins!`;
   $("#win-overlay").hidden = false;
@@ -199,6 +253,7 @@ function win(playerIdx) {
 }
 
 function nextPlayer() {
+  if (!state.busted && state.turnDarts.length > 0) recordTurn();
   state.currentPlayer = (state.currentPlayer + 1) % config.players;
   state.turnDarts = [];
   state.turnStartScore = state.scores[state.currentPlayer];
