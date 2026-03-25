@@ -21,7 +21,7 @@ MODEL_PATH = Path(__file__).resolve().parent.parent / "models" / "dart_keypoints
 
 # Change detection on warped frames (max per-camera diff vs held reference).
 # Noise: ~1.1-1.3 per cam. Dart landing: persistent 3-7 (accumulates per dart).
-DIFF_MOTION_THRESHOLD = 2.5
+DIFF_MOTION_THRESHOLD = 2.0
 
 
 # ── Detector (pre-loaded at startup) ──
