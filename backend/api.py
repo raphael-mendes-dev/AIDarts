@@ -22,6 +22,7 @@ MODEL_PATH = Path(__file__).resolve().parent.parent / "models" / "dart_keypoints
 # Change detection on warped frames (max per-camera diff vs held reference).
 # Noise: ~1.1-1.3 per cam. Dart landing: persistent 3-7 (accumulates per dart).
 DIFF_MOTION_THRESHOLD = 2.0
+RECHECK_INTERVAL = 3.0  # seconds — periodic re-detection when darts are on the board
 
 
 # ── Detector (pre-loaded at startup) ──
@@ -138,6 +139,8 @@ class FrameGrabber:
         self._auto_result_id = 0
         self._auto_enabled = False
         self._homographies: dict[str, list] = {}
+        self._last_detect_time: float = 0
+        self._last_detect_count: int = 0
 
     def start(self, camera_indexes: list[int]):
         self.stop()
@@ -191,6 +194,7 @@ class FrameGrabber:
     def set_baseline(self):
         self._ref_frames = {}
         self._change_pending = False
+        self._last_detect_count = 0
 
     def _loop(self):
         while not self._stop.is_set():
@@ -253,6 +257,12 @@ class FrameGrabber:
         if max_diff > DIFF_MOTION_THRESHOLD:
             log.info("Change detected (max_diff=%.1f) — will trigger next cycle", max_diff)
             self._change_pending = True
+            return
+
+        # Periodic re-detection when darts are on the board (for removal detection)
+        if self._last_detect_count > 0 and (time.monotonic() - self._last_detect_time) > RECHECK_INTERVAL:
+            log.info("Periodic recheck (last detected %d darts)", self._last_detect_count)
+            self._change_pending = True
 
     def _run_auto_detect(self, frames: dict[int, np.ndarray]):
         if _detector is None:
@@ -269,6 +279,8 @@ class FrameGrabber:
 
             self._auto_result = _run_detection(processed, t_start)
             self._auto_result_id += 1
+            self._last_detect_time = time.monotonic()
+            self._last_detect_count = self._auto_result["count"]
             log.info("Auto-detect: %d dart(s), %.0fms",
                      self._auto_result["count"], self._auto_result["time_ms"])
         except Exception:
