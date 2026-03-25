@@ -23,7 +23,7 @@ const state = {
   turnDarts: [],        // [{label, score, multiplier, segment, x_norm, y_norm}, ...]
   turnStartScore: 0,    // score at start of current turn (for bust revert)
   gameOver: false,
-  previousDartCount: 0, // track dart count changes for one-by-one detection
+  busted: false,
 };
 
 function initGame() {
@@ -32,7 +32,7 @@ function initGame() {
   state.turnDarts = [];
   state.turnStartScore = config.target;
   state.gameOver = false;
-  state.previousDartCount = 0;
+  state.busted = false;
   renderScoreboard();
   renderTurn();
   renderBoard();
@@ -130,7 +130,7 @@ function renderBoard() {
 /* ── Score application ── */
 
 function applyDart(dart) {
-  if (state.turnDarts.length >= 3 || state.gameOver) return;
+  if (state.turnDarts.length >= 3 || state.gameOver || state.busted) return;
 
   state.turnDarts.push(dart);
   const pIdx = state.currentPlayer;
@@ -170,6 +170,7 @@ function applyDart(dart) {
 }
 
 function bust() {
+  state.busted = true;
   state.scores[state.currentPlayer] = state.turnStartScore;
   setStatus("BUST! Score reverted.");
   highlightBust();
@@ -201,7 +202,7 @@ function nextPlayer() {
   state.currentPlayer = (state.currentPlayer + 1) % config.players;
   state.turnDarts = [];
   state.turnStartScore = state.scores[state.currentPlayer];
-  state.previousDartCount = 0;
+  state.busted = false;
   renderScoreboard();
   renderTurn();
   renderBoard();
@@ -216,7 +217,6 @@ function undoLastDart() {
   if (state.turnDarts.length === 0) return;
   const dart = state.turnDarts.pop();
   state.scores[state.currentPlayer] += dart.score;
-  state.previousDartCount = state.turnDarts.length;
   renderScoreboard();
   renderTurn();
   renderBoard();
@@ -303,35 +303,33 @@ async function pollResult() {
 }
 
 function handleDetectionResult(result) {
-  // Filter out low-confidence detections
   const darts = result.keypoints.filter(kp => kp.confidence >= CONFIDENCE_THRESHOLD);
   const dartCount = darts.length;
 
   // Waiting for board clear after 3 darts
   if (state.turnDarts.length >= 3) {
     if (dartCount === 0) {
-      // Board is clear — advance to next player
       nextPlayer();
     }
     return;
   }
 
-  // One-by-one detection: only process if dart count increased
-  if (dartCount > state.previousDartCount) {
-    // New dart(s) appeared — process only the new ones
-    const newDarts = darts.slice(state.previousDartCount);
-    for (const kp of newDarts) {
-      if (state.turnDarts.length >= 3) break;
-      applyDart({
-        label: kp.label,
-        score: kp.score,
-        multiplier: kp.multiplier,
-        segment: kp.segment,
-        x_norm: kp.x_norm,
-        y_norm: kp.y_norm,
-      });
-    }
-    state.previousDartCount = dartCount;
+  // Replace entire turn with all detected keypoints
+  if (dartCount === 0 || state.busted) return;
+
+  // Revert score to turn start, then re-apply all detected darts
+  state.scores[state.currentPlayer] = state.turnStartScore;
+  state.turnDarts = [];
+
+  for (const kp of darts) {
+    applyDart({
+      label: kp.label,
+      score: kp.score,
+      multiplier: kp.multiplier,
+      segment: kp.segment,
+      x_norm: kp.x_norm,
+      y_norm: kp.y_norm,
+    });
   }
 }
 
