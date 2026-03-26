@@ -1,4 +1,6 @@
-import { $, lsGet, loadImg, LS } from "./common.js";
+import { $, lsGet, loadImg, LS, initSettings } from "./common.js";
+
+await initSettings();
 
 const KP_COLOR = "#fff";
 const KP_GLOW = "rgba(255,255,255,0.45)";

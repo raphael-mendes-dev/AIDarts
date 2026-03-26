@@ -1,4 +1,6 @@
-import { $, $$, lsGet, lsSet, loadImg, warpWithH, EPS, LS } from "./common.js";
+import { $, $$, lsGet, lsSet, loadImg, warpWithH, EPS, LS, initSettings } from "./common.js";
+
+await initSettings();
 
 const HANDLE_KEYS = ["nw", "ne", "se", "sw"];
 const WIRE_SRC = {

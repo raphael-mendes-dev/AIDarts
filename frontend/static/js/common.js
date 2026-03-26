@@ -13,12 +13,29 @@ export const LS = {
 export const $ = (s, p) => (p || document).querySelector(s);
 export const $$ = (s, p) => [...(p || document).querySelectorAll(s)];
 
+/* Settings: cached in memory, persisted to server (data/settings.json) */
+
+let _settings = {};
+
+export async function initSettings() {
+  try {
+    const res = await fetch("/api/settings");
+    if (res.ok) _settings = await res.json();
+  } catch { /* server unavailable — start with empty defaults */ }
+}
+
 export function lsGet(k, fb) {
-  try { return JSON.parse(localStorage.getItem(k)) || fb; } catch { return fb; }
+  const v = _settings[k];
+  return v !== undefined ? v : fb;
 }
 
 export function lsSet(k, v) {
-  try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { console.warn("localStorage write failed:", k, e); }
+  _settings[k] = v;
+  fetch("/api/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ [k]: v }),
+  }).catch(e => console.warn("Settings save failed:", k, e));
 }
 
 export function loadImg(url) {

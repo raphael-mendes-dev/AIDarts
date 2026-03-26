@@ -1,4 +1,6 @@
-import { $, lsGet, LS } from "./common.js";
+import { $, lsGet, LS, initSettings } from "./common.js";
+
+await initSettings();
 
 const CONFIDENCE_THRESHOLD = 0.2;
 const DART_COLOR = "#fff";

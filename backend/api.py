@@ -1,13 +1,14 @@
 import base64
+import json
 import logging
 import threading
 import time
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import cv2
 import numpy as np
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Body, HTTPException
 from fastapi.responses import Response
 from PIL import Image
 from pydantic import BaseModel
@@ -20,6 +21,38 @@ log = logging.getLogger(__name__)
 CAMERA_PROBE_MAX = 10
 JPEG_QUALITY = 90
 MODEL_PATH = Path(__file__).resolve().parent.parent / "models" / "dart_keypoints.onnx"
+SETTINGS_PATH = Path(__file__).resolve().parent.parent / "data" / "settings.json"
+
+# ── Device settings (persisted to data/settings.json) ──
+
+_settings_lock = threading.Lock()
+
+
+def _read_settings() -> dict:
+    try:
+        return json.loads(SETTINGS_PATH.read_text())
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def _write_settings(data: dict):
+    SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    SETTINGS_PATH.write_text(json.dumps(data, indent=2))
+
+
+@router.get("/settings")
+def get_settings():
+    with _settings_lock:
+        return _read_settings()
+
+
+@router.post("/settings")
+def save_settings(body: dict[str, Any] = Body()):
+    with _settings_lock:
+        data = _read_settings()
+        data.update(body)
+        _write_settings(data)
+    return {"ok": True}
 
 # Change detection on warped frames (max per-camera diff vs held reference).
 # Noise: ~1.1-1.3 per cam. Dart landing: persistent 3-7 (accumulates per dart).
