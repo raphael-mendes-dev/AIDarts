@@ -26,6 +26,7 @@ Usage:
     # elapsed_ms: float       — ONNX inference time (excludes preprocessing)
 """
 
+import logging
 import time
 from pathlib import Path
 from typing import List, Tuple
@@ -34,6 +35,8 @@ import numpy as np
 import onnxruntime as ort
 from PIL import Image
 from scipy.ndimage import gaussian_filter, maximum_filter
+
+log = logging.getLogger(__name__)
 
 Keypoint = Tuple[float, float, float]  # (x_norm, y_norm, confidence)
 
@@ -136,17 +139,14 @@ class DartDetector:
         """Run dart detection on 3 camera images.
 
         Args:
-            pil_images: Exactly 3 PIL images (cam1, cam2, cam3).
+            pil_images: List of exactly 3 PIL images (cam1, cam2, cam3).
+                        Any size/mode accepted (converted internally).
 
         Pipeline:
             1. Preprocess: resize, normalize, concatenate into 9-channel tensor
             2. ONNX inference: produces count logits + heatmap
             3. Post-process: Gaussian smooth -> non-max suppression -> top-k
                peaks -> subpixel refinement -> normalized coordinates
-
-        Args:
-            pil_images: List of exactly 3 PIL images (cam1, cam2, cam3).
-                        Any size/mode accepted (converted internally).
 
         Returns:
             Tuple of (count, keypoints, elapsed_ms):

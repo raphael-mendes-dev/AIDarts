@@ -38,8 +38,9 @@ export function warpWithH(img, H) {
   const w = img.naturalWidth, h = img.naturalHeight;
   const srcCvs = document.createElement("canvas");
   srcCvs.width = w; srcCvs.height = h;
-  srcCvs.getContext("2d").drawImage(img, 0, 0);
-  const sd = srcCvs.getContext("2d").getImageData(0, 0, w, h).data;
+  const srcCtx = srcCvs.getContext("2d");
+  srcCtx.drawImage(img, 0, 0);
+  const sd = srcCtx.getImageData(0, 0, w, h).data;
 
   const outCvs = document.createElement("canvas");
   outCvs.width = w; outCvs.height = h;

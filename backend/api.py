@@ -12,6 +12,8 @@ from fastapi.responses import Response
 from PIL import Image
 from pydantic import BaseModel
 
+from backend.scorer import score_dart
+
 router = APIRouter(prefix="/api")
 log = logging.getLogger(__name__)
 
@@ -97,8 +99,6 @@ def _frame_to_b64jpg(frame: np.ndarray) -> str:
 
 def _run_detection(processed: list[np.ndarray], t_start: float, capture_ms: float = 0) -> dict:
     """Shared detection pipeline: BGR frames → inference → result dict with scores."""
-    from backend.scorer import score_dart
-
     pil_images = [Image.fromarray(cv2.cvtColor(f, cv2.COLOR_BGR2RGB)) for f in processed]
     count, kps, inference_ms = _detector.predict(pil_images)
     t_end = time.perf_counter()

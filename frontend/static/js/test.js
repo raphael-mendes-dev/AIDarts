@@ -88,21 +88,21 @@ function renderFusion(imgs, keypoints) {
       const kp = keypoints[i];
       const px = dx + kp.x_norm * dw;
       const py = dy + kp.y_norm * dh;
-      const r = KP_RADIUS * dpr;
+      const kr = KP_RADIUS * dpr;
 
       ctx.save();
       ctx.shadowColor = KP_GLOW;
       ctx.shadowBlur = 10 * dpr;
       ctx.fillStyle = KP_COLOR;
       ctx.beginPath();
-      ctx.arc(px, py, r, 0, Math.PI * 2);
+      ctx.arc(px, py, kr, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
 
       ctx.strokeStyle = "rgba(0,0,0,0.4)";
       ctx.lineWidth = 1.5 * dpr;
       ctx.beginPath();
-      ctx.arc(px, py, r, 0, Math.PI * 2);
+      ctx.arc(px, py, kr, 0, Math.PI * 2);
       ctx.stroke();
     }
   }
