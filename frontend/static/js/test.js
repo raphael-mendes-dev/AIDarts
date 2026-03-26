@@ -1,9 +1,7 @@
 import { $, lsGet, loadImg, LS } from "./common.js";
 
-const COLORS = ["#ff3232", "#32c832", "#329aff"];
-const KP_ARM = 10;
-const KP_RADIUS = 6;
-const KP_DOT = 2;
+const KP_COLOR = "#00e0ff";
+const KP_RADIUS = 4;
 const AUTO_POLL_MS = 250;
 
 const cameras = lsGet(LS.CAMS, { 1: "", 2: "", 3: "" });
@@ -85,22 +83,14 @@ function renderFusion(imgs, keypoints) {
   ctx.globalAlpha = 1;
 
   if (keypoints?.length) {
+    ctx.fillStyle = KP_COLOR;
     for (let i = 0; i < keypoints.length; i++) {
       const kp = keypoints[i];
       const px = dx + kp.x_norm * dw;
       const py = dy + kp.y_norm * dh;
-      const color = COLORS[i % COLORS.length];
-      const arm = KP_ARM * dpr;
-
-      ctx.save();
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 1 * dpr;
-      ctx.beginPath(); ctx.moveTo(px - arm, py); ctx.lineTo(px + arm, py); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(px, py - arm); ctx.lineTo(px, py + arm); ctx.stroke();
-      ctx.beginPath(); ctx.arc(px, py, KP_RADIUS * dpr, 0, Math.PI * 2); ctx.stroke();
-      ctx.fillStyle = color;
-      ctx.beginPath(); ctx.arc(px, py, KP_DOT * dpr, 0, Math.PI * 2); ctx.fill();
-      ctx.restore();
+      ctx.beginPath();
+      ctx.arc(px, py, KP_RADIUS * dpr, 0, Math.PI * 2);
+      ctx.fill();
     }
   }
 }
@@ -126,11 +116,10 @@ function updateInfo(result) {
   kpList.innerHTML = "";
   for (let i = 0; i < result.keypoints.length; i++) {
     const kp = result.keypoints[i];
-    const color = COLORS[i % COLORS.length];
     const row = document.createElement("div");
     row.className = "kp-row";
     row.innerHTML =
-      `<span><span class="kp-dot" style="background:${color}"></span>Dart ${kp.dart}</span>` +
+      `<span><span class="kp-dot" style="background:${KP_COLOR}"></span>Dart ${kp.dart}</span>` +
       `<span class="kp-coords">(${kp.x_norm.toFixed(3)}, ${kp.y_norm.toFixed(3)}) conf ${kp.confidence.toFixed(3)}</span>`;
     kpList.appendChild(row);
   }

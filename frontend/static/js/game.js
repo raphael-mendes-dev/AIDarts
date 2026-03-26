@@ -1,8 +1,8 @@
 import { $, $$, lsGet, loadImg, LS } from "./common.js";
 
 const CONFIDENCE_THRESHOLD = 0.2;
-const DART_COLORS = ["#ff3232", "#32c832", "#329aff"];
-const DART_MARKER_RADIUS = 8;
+const DART_COLOR = "#00e0ff";
+const DART_MARKER_RADIUS = 4;
 const AUTO_POLL_MS = 250;
 
 /* ── Parse game config from URL ── */
@@ -101,33 +101,14 @@ function renderBoard() {
   const ctx = boardCanvas.getContext("2d");
   ctx.clearRect(0, 0, sz, sz);
 
+  ctx.fillStyle = DART_COLOR;
   for (let i = 0; i < state.turnDarts.length; i++) {
     const d = state.turnDarts[i];
     const x = d.x_norm * sz;
     const y = d.y_norm * sz;
-    const color = DART_COLORS[i % DART_COLORS.length];
-
-    // Crosshair + circle marker
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(x - DART_MARKER_RADIUS, y); ctx.lineTo(x + DART_MARKER_RADIUS, y); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x, y - DART_MARKER_RADIUS); ctx.lineTo(x, y + DART_MARKER_RADIUS); ctx.stroke();
-    ctx.beginPath(); ctx.arc(x, y, DART_MARKER_RADIUS, 0, Math.PI * 2); ctx.stroke();
-
-    // Center dot
-    ctx.fillStyle = color;
-    ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
-
-    // Label
-    ctx.font = "bold 14px sans-serif";
-    ctx.fillStyle = "#fff";
-    ctx.strokeStyle = "#000";
-    ctx.lineWidth = 3;
-    const lbl = d.label;
-    const tx = x + DART_MARKER_RADIUS + 4;
-    const ty = y - DART_MARKER_RADIUS;
-    ctx.strokeText(lbl, tx, ty);
-    ctx.fillText(lbl, tx, ty);
+    ctx.beginPath();
+    ctx.arc(x, y, DART_MARKER_RADIUS, 0, Math.PI * 2);
+    ctx.fill();
   }
 }
 
