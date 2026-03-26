@@ -1,4 +1,4 @@
-body { padding: 20px 32px 64px; }
+body { padding: 20px 32px 64px; width: 100%; max-width: 100%; }
 
 main {
   display: grid;
