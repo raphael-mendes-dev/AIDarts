@@ -30,27 +30,28 @@
         </div>
       </section>
 
-      <!-- Current turn darts -->
-      <section class="turn-panel">
-        <div class="turn-darts" id="turn-darts">
-          <div class="dart-slot" id="dart-1">—</div>
-          <div class="dart-slot" id="dart-2">—</div>
-          <div class="dart-slot" id="dart-3">—</div>
-        </div>
-        <div class="turn-total">
-          <span>Turn:</span>
-          <span id="turn-total">0</span>
-        </div>
-      </section>
+      <!-- Sidebar: turn + status + actions -->
+      <div class="sidebar">
+        <section class="turn-panel">
+          <div class="turn-darts" id="turn-darts">
+            <div class="dart-slot" id="dart-1">—</div>
+            <div class="dart-slot" id="dart-2">—</div>
+            <div class="dart-slot" id="dart-3">—</div>
+          </div>
+          <div class="turn-total">
+            <span>Turn:</span>
+            <span id="turn-total">0</span>
+          </div>
+        </section>
 
-      <!-- Status / actions -->
-      <section class="status-panel">
-        <p class="status-text" id="status-text">Throw your darts...</p>
-        <div class="action-row">
-          <button class="action-btn" id="btn-miss">Miss</button>
-          <button class="action-btn action-btn-primary" id="btn-next" disabled>Next Player</button>
-        </div>
-      </section>
+        <section class="status-panel">
+          <p class="status-text" id="status-text">Throw your darts...</p>
+          <div class="action-row">
+            <button class="action-btn" id="btn-miss">Miss</button>
+            <button class="action-btn action-btn-primary" id="btn-next" disabled>Next Player</button>
+          </div>
+        </section>
+      </div>
 
       <!-- History -->
       <section class="history-section" id="history"></section>
