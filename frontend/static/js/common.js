@@ -3,7 +3,6 @@
 export const EPS = 1e-12;
 
 export const LS = {
-  DC:   "aidarts_dc_enabled",
   CAMS: "aidarts_cam_assign",
   CAL:  "aidarts_calib",
   DET:  "aidarts_detected",

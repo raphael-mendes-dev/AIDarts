@@ -109,9 +109,6 @@ const modal = {
 
 /* ── DOM refs ── */
 
-const toggleDC   = $("#toggle-dc");
-const rowFolder  = $("#row-folder");
-const folderName = $("#folder-name");
 const btnScan    = $("#btn-scan");
 const scanStatus = $("#scan-status");
 const selects    = [1,2,3].map(i => $(`#cam-sel-${i}`));
@@ -137,25 +134,7 @@ function revokeOriginal(slot) {
   if (originals[slot]?.url) URL.revokeObjectURL(originals[slot].url);
 }
 
-/* ── 1. Data Collection ── */
-
-toggleDC.checked = lsGet(LS.DC, true);
-syncDC();
-toggleDC.addEventListener("change", () => { lsSet(LS.DC, toggleDC.checked); syncDC(); });
-function syncDC() { rowFolder.setAttribute("aria-disabled", toggleDC.checked ? "false" : "true"); }
-
-$("#btn-folder").addEventListener("click", async () => {
-  if (!window.showDirectoryPicker) { folderName.textContent = "Not supported"; return; }
-  try {
-    const h = await window.showDirectoryPicker();
-    folderName.textContent = h.name;
-    folderName.classList.add("is-set");
-  } catch (e) {
-    if (e.name !== "AbortError") console.warn("Directory picker failed:", e);
-  }
-});
-
-/* ── 2. Cameras ── */
+/* ── 1. Cameras ── */
 
 if (detected.length) { populateSelects(); scanStatus.textContent = `${detected.length} camera(s)`; }
 
