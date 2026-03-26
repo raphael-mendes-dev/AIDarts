@@ -270,6 +270,40 @@ main {
 .history-table td.is-miss { color: var(--text-muted); }
 .history-table .turn-col { font-weight: 700; }
 
+/* ── Clear board modal ── */
+
+.clear-overlay {
+  position: fixed; inset: 0; z-index: 9998;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(6px);
+}
+
+.clear-overlay[hidden] { display: none; }
+
+.clear-content {
+  display: flex; flex-direction: column; align-items: center; gap: 20px;
+  padding: 36px 44px;
+  background: rgba(18, 18, 18, 0.95);
+  border: 1px solid var(--panel-border);
+  border-radius: 20px;
+}
+
+.clear-content p {
+  margin: 0;
+  font-size: 1.1rem; font-weight: 600;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.clear-spinner {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.15);
+  border-top-color: var(--accent);
+  animation: spinner 0.8s linear infinite;
+}
+
 /* ── Win overlay ── */
 
 .win-overlay {

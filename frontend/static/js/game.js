@@ -64,6 +64,7 @@ function initGame() {
   renderHistory();
   setStatus("Checking board...");
   $("#win-overlay").hidden = true;
+  clearOverlay.hidden = true;
   boardWrap.classList.add("is-waiting");
   btnNext.disabled = true;
   btnMiss.disabled = true;
@@ -80,6 +81,7 @@ const boardWrap = $(".board-wrap");
 const btnMiss = $("#btn-miss");
 const btnNext = $("#btn-next");
 const historyEl = $("#history");
+const clearOverlay = $("#clear-overlay");
 
 /* ── Render scoreboard ── */
 
@@ -443,11 +445,12 @@ function handleDetectionResult(result) {
     if (darts.length === 0) {
       state.waitingForClear = false;
       boardWrap.classList.remove("is-waiting");
+      clearOverlay.hidden = true;
       setStatus("Throw your darts...");
       btnMiss.disabled = false;
       fetch("/api/grabber/baseline", { method: "POST" }).catch(() => {});
     } else {
-      setStatus("Remove darts from board to start");
+      clearOverlay.hidden = false;
     }
     return;
   }
