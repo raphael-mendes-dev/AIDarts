@@ -46,6 +46,8 @@ main { display: flex; flex-direction: column; align-items: center; gap: 20px; }
 .kp-dot {
   display: inline-block; width: 8px; height: 8px;
   border-radius: 50%; margin-right: 6px; vertical-align: middle;
+  background: #fff;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.4);
 }
 
 .kp-coords { color: var(--text-muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; }

@@ -1,7 +1,8 @@
 import { $, lsGet, loadImg, LS } from "./common.js";
 
-const KP_COLOR = "#00e0ff";
-const KP_RADIUS = 4;
+const KP_COLOR = "#fff";
+const KP_GLOW = "rgba(255,255,255,0.45)";
+const KP_RADIUS = 5;
 const AUTO_POLL_MS = 250;
 
 const cameras = lsGet(LS.CAMS, { 1: "", 2: "", 3: "" });
@@ -83,14 +84,26 @@ function renderFusion(imgs, keypoints) {
   ctx.globalAlpha = 1;
 
   if (keypoints?.length) {
-    ctx.fillStyle = KP_COLOR;
     for (let i = 0; i < keypoints.length; i++) {
       const kp = keypoints[i];
       const px = dx + kp.x_norm * dw;
       const py = dy + kp.y_norm * dh;
+      const r = KP_RADIUS * dpr;
+
+      ctx.save();
+      ctx.shadowColor = KP_GLOW;
+      ctx.shadowBlur = 10 * dpr;
+      ctx.fillStyle = KP_COLOR;
       ctx.beginPath();
-      ctx.arc(px, py, KP_RADIUS * dpr, 0, Math.PI * 2);
+      ctx.arc(px, py, r, 0, Math.PI * 2);
       ctx.fill();
+      ctx.restore();
+
+      ctx.strokeStyle = "rgba(0,0,0,0.4)";
+      ctx.lineWidth = 1.5 * dpr;
+      ctx.beginPath();
+      ctx.arc(px, py, r, 0, Math.PI * 2);
+      ctx.stroke();
     }
   }
 }
@@ -119,7 +132,7 @@ function updateInfo(result) {
     const row = document.createElement("div");
     row.className = "kp-row";
     row.innerHTML =
-      `<span><span class="kp-dot" style="background:${KP_COLOR}"></span>Dart ${kp.dart}</span>` +
+      `<span><span class="kp-dot"></span>Dart ${kp.dart}</span>` +
       `<span class="kp-coords">(${kp.x_norm.toFixed(3)}, ${kp.y_norm.toFixed(3)}) conf ${kp.confidence.toFixed(3)}</span>`;
     kpList.appendChild(row);
   }

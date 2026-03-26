@@ -1,8 +1,11 @@
 import { $, $$, lsGet, loadImg, LS } from "./common.js";
 
 const CONFIDENCE_THRESHOLD = 0.2;
-const DART_COLOR = "#00e0ff";
-const DART_MARKER_RADIUS = 4;
+const DART_COLOR = "#fff";
+const DART_GLOW = "rgba(255,255,255,0.45)";
+const DART_RADIUS = 5;
+const HIT_RADIUS = 25;
+const DRAG_THRESHOLD = 8;
 const AUTO_POLL_MS = 250;
 
 /* ── Parse game config from URL ── */
@@ -27,6 +30,24 @@ const state = {
   history: [],          // [{player, darts: [{label, score}...], total, remaining, busted}]
 };
 
+/* ── Client-side scorer (mirrors backend/scorer.py) ── */
+
+const _R = 225.5;
+const RINGS = { bull: 6.35/_R, outerBull: 15.9/_R, triIn: 99/_R, triOut: 107/_R, dblIn: 162/_R, dblOut: 170/_R };
+const SECTORS = [20,1,18,4,13,6,10,15,2,17,3,19,7,16,8,11,14,9,12,5];
+
+function scoreDart(xn, yn) {
+  const dx = (xn - 0.5) * 2, dy = (yn - 0.5) * 2;
+  const r = Math.hypot(dx, dy);
+  if (r <= RINGS.bull) return { segment: 25, multiplier: 2, score: 50, label: "Bull" };
+  if (r <= RINGS.outerBull) return { segment: 25, multiplier: 1, score: 25, label: "Outer Bull" };
+  if (r > RINGS.dblOut) return { segment: 0, multiplier: 0, score: 0, label: "Miss" };
+  let a = ((Math.atan2(dx, -dy) + Math.PI / 20) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+  const seg = SECTORS[Math.floor(a / (Math.PI / 10)) % 20];
+  const mul = r > RINGS.dblIn ? 2 : (r > RINGS.triIn && r <= RINGS.triOut) ? 3 : 1;
+  return { segment: seg, multiplier: mul, score: seg * mul, label: mul === 3 ? `T${seg}` : mul === 2 ? `D${seg}` : `${seg}` };
+}
+
 function initGame() {
   state.scores = Array(config.players).fill(config.target);
   state.currentPlayer = 0;
@@ -41,7 +62,6 @@ function initGame() {
   renderHistory();
   setStatus("Throw your darts...");
   $("#win-overlay").hidden = true;
-  btnUndo.disabled = true;
   btnNext.disabled = true;
 }
 
@@ -52,7 +72,6 @@ const turnDartsEl = $("#turn-darts");
 const turnTotalEl = $("#turn-total");
 const statusEl = $("#status-text");
 const boardCanvas = $("#board-canvas");
-const btnUndo = $("#btn-undo");
 const btnMiss = $("#btn-miss");
 const btnNext = $("#btn-next");
 const historyEl = $("#history");
@@ -101,14 +120,27 @@ function renderBoard() {
   const ctx = boardCanvas.getContext("2d");
   ctx.clearRect(0, 0, sz, sz);
 
-  ctx.fillStyle = DART_COLOR;
   for (let i = 0; i < state.turnDarts.length; i++) {
     const d = state.turnDarts[i];
     const x = d.x_norm * sz;
     const y = d.y_norm * sz;
+
+    // Soft glow
+    ctx.save();
+    ctx.shadowColor = DART_GLOW;
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = DART_COLOR;
     ctx.beginPath();
-    ctx.arc(x, y, DART_MARKER_RADIUS, 0, Math.PI * 2);
+    ctx.arc(x, y, DART_RADIUS, 0, Math.PI * 2);
     ctx.fill();
+    ctx.restore();
+
+    // Crisp border
+    ctx.strokeStyle = "rgba(0,0,0,0.4)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(x, y, DART_RADIUS, 0, Math.PI * 2);
+    ctx.stroke();
   }
 }
 
@@ -174,7 +206,6 @@ function applyDart(dart) {
   renderScoreboard();
   renderTurn();
   renderBoard();
-  btnUndo.disabled = false;
 
   // Win check
   if (newScore === 0) {
@@ -204,17 +235,13 @@ function recordTurn(busted = false) {
 
 function bust() {
   state.busted = true;
-  recordTurn(true);
   state.scores[state.currentPlayer] = state.turnStartScore;
-  setStatus("BUST! Score reverted.");
+  setStatus("BUST — correct the score or remove darts");
   highlightBust();
   renderScoreboard();
   renderTurn();
   renderBoard();
-  btnUndo.disabled = true;
-
-  // Auto-advance after bust
-  setTimeout(() => nextPlayer(), 2000);
+  btnNext.disabled = false;
 }
 
 function highlightBust() {
@@ -234,7 +261,7 @@ function win(playerIdx) {
 }
 
 function nextPlayer() {
-  if (!state.busted && state.turnDarts.length > 0) recordTurn();
+  recordTurn(state.busted);
   state.currentPlayer = (state.currentPlayer + 1) % config.players;
   state.turnDarts = [];
   state.turnStartScore = state.scores[state.currentPlayer];
@@ -242,24 +269,9 @@ function nextPlayer() {
   renderScoreboard();
   renderTurn();
   renderBoard();
-  btnUndo.disabled = true;
   btnNext.disabled = true;
   setStatus("Throw your darts...");
   // Reset auto-detect baseline for new turn
-  fetch("/api/grabber/baseline", { method: "POST" }).catch(() => {});
-}
-
-function undoLastDart() {
-  if (state.turnDarts.length === 0) return;
-  const dart = state.turnDarts.pop();
-  state.scores[state.currentPlayer] += dart.score;
-  renderScoreboard();
-  renderTurn();
-  renderBoard();
-  btnUndo.disabled = state.turnDarts.length === 0;
-  btnNext.disabled = true;
-  setStatus(`Dart ${state.turnDarts.length + 1} of 3 — throw next dart`);
-  // Reset baseline so auto-detect re-evaluates from current state
   fetch("/api/grabber/baseline", { method: "POST" }).catch(() => {});
 }
 
@@ -270,6 +282,102 @@ function recordMiss() {
 function setStatus(text) {
   statusEl.textContent = text;
 }
+
+/* ── Recalculate turn from current turnDarts (for manual edits) ── */
+
+function recalcTurn() {
+  state.scores[state.currentPlayer] = state.turnStartScore;
+  state.busted = false;
+
+  for (const d of state.turnDarts) {
+    const ns = state.scores[state.currentPlayer] - d.score;
+    if (ns < 0 || (config.checkout === "double" && ns === 1) ||
+        (ns === 0 && config.checkout === "double" && d.multiplier !== 2)) {
+      state.scores[state.currentPlayer] = state.turnStartScore;
+      state.busted = true;
+      break;
+    }
+    state.scores[state.currentPlayer] = ns;
+    if (ns === 0) { win(state.currentPlayer); return; }
+  }
+
+  renderScoreboard();
+  renderTurn();
+  renderBoard();
+
+  if (state.busted) {
+    setStatus("BUST — correct the score or remove darts");
+    highlightBust();
+    btnNext.disabled = false;
+  } else if (state.turnDarts.length >= 3) {
+    setStatus("Remove darts from board...");
+    btnNext.disabled = false;
+  } else {
+    setStatus(state.turnDarts.length
+      ? `Dart ${state.turnDarts.length + 1} of 3 — throw next dart`
+      : "Throw your darts...");
+    btnNext.disabled = true;
+  }
+  fetch("/api/grabber/baseline", { method: "POST" }).catch(() => {});
+}
+
+/* ── Board interaction: tap to place/remove, drag to move ── */
+
+let _drag = null; // { idx, startX, startY, moved }
+
+function boardCoords(e) {
+  const r = boardCanvas.getBoundingClientRect();
+  return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
+}
+
+function hitTest(nx, ny) {
+  const r = boardCanvas.getBoundingClientRect();
+  const thresh = HIT_RADIUS / r.width;
+  for (let i = 0; i < state.turnDarts.length; i++) {
+    const d = state.turnDarts[i];
+    if (d.x_norm < 0) continue; // miss (off-board)
+    if (Math.hypot(d.x_norm - nx, d.y_norm - ny) < thresh) return i;
+  }
+  return -1;
+}
+
+boardCanvas.addEventListener("pointerdown", e => {
+  if (state.gameOver) return;
+  const p = boardCoords(e);
+  const hit = hitTest(p.x, p.y);
+
+  if (hit >= 0) {
+    _drag = { idx: hit, startX: e.clientX, startY: e.clientY, moved: false };
+    boardCanvas.setPointerCapture(e.pointerId);
+  } else if (state.turnDarts.length < 3 && !state.busted) {
+    const info = scoreDart(p.x, p.y);
+    applyDart({ ...info, x_norm: p.x, y_norm: p.y });
+  }
+});
+
+boardCanvas.addEventListener("pointermove", e => {
+  if (!_drag) return;
+  if (!_drag.moved && Math.hypot(e.clientX - _drag.startX, e.clientY - _drag.startY) < DRAG_THRESHOLD) return;
+  _drag.moved = true;
+  const p = boardCoords(e);
+  state.turnDarts[_drag.idx].x_norm = p.x;
+  state.turnDarts[_drag.idx].y_norm = p.y;
+  renderBoard();
+});
+
+boardCanvas.addEventListener("pointerup", e => {
+  if (!_drag) return;
+  const { idx, moved } = _drag;
+  _drag = null;
+
+  if (moved) {
+    const d = state.turnDarts[idx];
+    Object.assign(d, scoreDart(d.x_norm, d.y_norm));
+  } else {
+    state.turnDarts.splice(idx, 1);
+  }
+  recalcTurn();
+});
 
 /* ── Auto-detect integration ── */
 
@@ -340,38 +448,29 @@ async function pollResult() {
 
 function handleDetectionResult(result) {
   const darts = result.keypoints.filter(kp => kp.confidence >= CONFIDENCE_THRESHOLD);
-  const dartCount = darts.length;
 
-  // Waiting for board clear after 3 darts
-  if (state.turnDarts.length >= 3) {
-    if (dartCount === 0) {
-      nextPlayer();
-    }
+  // Board cleared (0 darts) after turn complete or bust → advance
+  if (darts.length === 0 && (state.turnDarts.length >= 3 || state.busted)) {
+    nextPlayer();
     return;
   }
 
+  // Waiting for board clear after 3 darts (still darts on board)
+  if (state.turnDarts.length >= 3) return;
+
+  if (darts.length === 0) return;
+
   // Replace entire turn with all detected keypoints
-  if (dartCount === 0 || state.busted) return;
-
-  // Revert score to turn start, then re-apply all detected darts
-  state.scores[state.currentPlayer] = state.turnStartScore;
-  state.turnDarts = [];
-
-  for (const kp of darts) {
-    applyDart({
-      label: kp.label,
-      score: kp.score,
-      multiplier: kp.multiplier,
-      segment: kp.segment,
-      x_norm: kp.x_norm,
-      y_norm: kp.y_norm,
-    });
-  }
+  state.turnDarts = darts.map(kp => ({
+    label: kp.label, score: kp.score,
+    multiplier: kp.multiplier, segment: kp.segment,
+    x_norm: kp.x_norm, y_norm: kp.y_norm,
+  }));
+  recalcTurn();
 }
 
 /* ── Event bindings ── */
 
-btnUndo.addEventListener("click", undoLastDart);
 btnMiss.addEventListener("click", recordMiss);
 btnNext.addEventListener("click", nextPlayer);
 $("#btn-restart").addEventListener("click", () => {
