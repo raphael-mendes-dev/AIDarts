@@ -82,7 +82,8 @@ function renderScoreboard() {
   scoreboardEl.innerHTML = "";
   for (let i = 0; i < config.players; i++) {
     const card = document.createElement("div");
-    card.className = "player-card" + (i === state.currentPlayer ? " is-active" : "");
+    const active = i === state.currentPlayer;
+    card.className = "player-card" + (active ? " is-active" : "") + (active && state.busted ? " is-bust" : "");
     card.innerHTML =
       `<span class="player-name">P${i + 1}</span>` +
       `<span class="player-score">${state.scores[i]}</span>`;
@@ -237,19 +238,10 @@ function bust() {
   state.busted = true;
   state.scores[state.currentPlayer] = state.turnStartScore;
   setStatus("BUST — correct the score or remove darts");
-  highlightBust();
   renderScoreboard();
   renderTurn();
   renderBoard();
   btnNext.disabled = false;
-}
-
-function highlightBust() {
-  const cards = $$(".player-card", scoreboardEl);
-  if (cards[state.currentPlayer]) {
-    cards[state.currentPlayer].classList.add("is-bust");
-    setTimeout(() => cards[state.currentPlayer]?.classList.remove("is-bust"), 2000);
-  }
 }
 
 function win(playerIdx) {
@@ -307,7 +299,6 @@ function recalcTurn() {
 
   if (state.busted) {
     setStatus("BUST — correct the score or remove darts");
-    highlightBust();
     btnNext.disabled = false;
   } else if (state.turnDarts.length >= 3) {
     setStatus("Remove darts from board...");
@@ -454,6 +445,9 @@ function handleDetectionResult(result) {
     nextPlayer();
     return;
   }
+
+  // Busted: ignore new detections, only removal (above) matters
+  if (state.busted) return;
 
   // Waiting for board clear after 3 darts (still darts on board)
   if (state.turnDarts.length >= 3) return;
