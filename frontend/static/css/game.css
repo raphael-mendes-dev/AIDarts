@@ -12,11 +12,10 @@ main {
   flex: 1; min-height: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
   grid-template-areas:
     "scoreboard scoreboard"
-    "board      sidebar"
-    "history    history";
+    "board      sidebar";
   gap: 12px;
   padding: 12px 24px 16px;
 }
@@ -201,14 +200,14 @@ main {
 /* ── History ── */
 
 .history-section {
-  grid-area: history;
-  min-height: 0;
-  max-height: 160px;
+  flex: 1; min-height: 0;
   overflow-y: auto;
-  border-radius: 12px;
+  border-radius: 10px;
   border: 1px solid var(--panel-border);
   background: var(--panel-bg);
 }
+
+.history-section:empty { display: none; }
 
 .history-table {
   width: 100%;
@@ -308,7 +307,7 @@ main {
   .action-btn { height: 40px; border-radius: 8px; font-size: 0.85rem; }
   .action-row { gap: 6px; }
 
-  .history-section { max-height: 180px; border-radius: 10px; }
+  .history-section { max-height: 200px; flex: none; border-radius: 10px; }
   .history-table th { padding: 6px 3px; font-size: 0.68rem; }
   .history-table td { padding: 5px 3px; font-size: 0.75rem; }
 
