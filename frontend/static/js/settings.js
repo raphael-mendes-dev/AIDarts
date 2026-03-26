@@ -187,27 +187,28 @@ selects.forEach((sel, i) => {
   sel.addEventListener("change", () => { assign[i+1] = sel.value; lsSet(LS.CAMS, assign); if (sel.value) loadPreview(i+1); else clearPreview(i+1); });
 });
 
-function loadPreview(slot) {
-  const idx = assign[slot]; if (idx === "") return Promise.resolve();
+async function loadPreview(slot) {
+  const idx = assign[slot]; if (idx === "") return;
   const tile = $(`#tile-${slot}`); tile.classList.add("is-busy");
-  return fetch(`/api/cameras/${idx}/snapshot`)
-    .then(r => { if (!r.ok) throw 0; return r.blob(); })
-    .then(blob => new Promise(resolve => {
-      const url = URL.createObjectURL(blob);
-      loadImg(url).then(img => {
-        tile.classList.remove("is-busy"); tile.classList.add("is-live");
-        revokeOriginal(slot);
-        originals[slot] = { url, img };
-        if (storedH[slot]) {
-          applyTotalH(slot, resolve);
-        } else {
-          setPreviewEverywhere(slot, url, img);
-          scheduleFusion();
-          resolve();
-        }
-      });
-    }))
-    .catch((e) => { if (e) console.warn("Preview load failed:", e); tile.classList.remove("is-busy"); });
+  try {
+    const r = await fetch(`/api/cameras/${idx}/snapshot`);
+    if (!r.ok) return;
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const img = await loadImg(url);
+    tile.classList.remove("is-busy"); tile.classList.add("is-live");
+    revokeOriginal(slot);
+    originals[slot] = { url, img };
+    if (storedH[slot]) {
+      await new Promise(resolve => applyTotalH(slot, resolve));
+    } else {
+      setPreviewEverywhere(slot, url, img);
+      scheduleFusion();
+    }
+  } catch (e) {
+    console.warn("Preview load failed:", e);
+    tile.classList.remove("is-busy");
+  }
 }
 
 // Warp the ORIGINAL image with the cumulative H — never warp an already-warped image
@@ -387,7 +388,7 @@ $("#modal-backdrop").addEventListener("click", closeModal);
 $("#btn-close").addEventListener("click", closeModal);
 window.addEventListener("keydown", e => { if (e.key === "Escape" && modal.open) closeModal(); });
 
-$("#btn-reset").addEventListener("click", () => {
+$("#btn-reset").addEventListener("click", async () => {
   const slot = modal.slot;
   if (!slot) return;
 
@@ -400,26 +401,28 @@ $("#btn-reset").addEventListener("click", () => {
   if (idx !== "") {
     const tile = $(`#tile-${slot}`);
     tile.classList.add("is-busy");
-    fetch(`/api/cameras/${idx}/snapshot`)
-      .then(r => { if (!r.ok) throw 0; return r.blob(); })
-      .then(blob => {
-        const url = URL.createObjectURL(blob);
-        loadImg(url).then(img => {
-          tile.classList.remove("is-busy");
-          revokeOriginal(slot);
-          originals[slot] = { url, img };
-          setPreviewEverywhere(slot, url, img);
-          if (modal.open && modal.slot === slot) {
-            modalImg.src = url;
-            modalTile.classList.add("is-live");
-            const L = getLayout();
-            if (L) modal.anchors = defaultAnchors(L);
-            renderWire();
-          }
-          scheduleFusion();
-        });
-      })
-      .catch((e) => { if (e) console.warn("Reset snapshot failed:", e); tile.classList.remove("is-busy"); });
+    try {
+      const r = await fetch(`/api/cameras/${idx}/snapshot`);
+      if (!r.ok) return;
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const img = await loadImg(url);
+      tile.classList.remove("is-busy");
+      revokeOriginal(slot);
+      originals[slot] = { url, img };
+      setPreviewEverywhere(slot, url, img);
+      if (modal.open && modal.slot === slot) {
+        modalImg.src = url;
+        modalTile.classList.add("is-live");
+        const L = getLayout();
+        if (L) modal.anchors = defaultAnchors(L);
+        renderWire();
+      }
+      scheduleFusion();
+    } catch (e) {
+      console.warn("Reset snapshot failed:", e);
+      tile.classList.remove("is-busy");
+    }
   } else {
     const L = getLayout();
     if (L) modal.anchors = defaultAnchors(L);

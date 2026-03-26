@@ -1,4 +1,4 @@
-import { $, lsGet, loadImg, LS, initSettings } from "./common.js";
+import { $, lsGet, loadImg, LS, initSettings, buildCameraBody, buildHomographies } from "./common.js";
 
 await initSettings();
 
@@ -8,25 +8,6 @@ const KP_RADIUS = 5;
 const AUTO_POLL_MS = 250;
 
 const cameras = lsGet(LS.CAMS, { 1: "", 2: "", 3: "" });
-const homographies = lsGet(LS.H, {});
-
-/* ── Start background frame grabber, stop on page unload ── */
-
-function buildCameraBody() {
-  const body = {};
-  for (const s of ["1", "2", "3"]) {
-    if (cameras[s] !== "") body[s] = Number(cameras[s]);
-  }
-  return body;
-}
-
-function buildHomographies() {
-  const h = {};
-  for (const s of ["1", "2", "3"]) {
-    if (homographies[s]) h[s] = homographies[s];
-  }
-  return h;
-}
 
 fetch("/api/grabber/start", {
   method: "POST",

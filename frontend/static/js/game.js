@@ -1,4 +1,4 @@
-import { $, lsGet, LS, initSettings } from "./common.js";
+import { $, lsGet, LS, initSettings, buildCameraBody, buildHomographies } from "./common.js";
 
 await initSettings();
 
@@ -373,25 +373,6 @@ boardCanvas.addEventListener("pointerup", e => {
 });
 
 /* ── Auto-detect integration ── */
-
-const cameras = lsGet(LS.CAMS, { 1: "", 2: "", 3: "" });
-const homographies = lsGet(LS.H, {});
-
-function buildCameraBody() {
-  const body = {};
-  for (const s of ["1", "2", "3"]) {
-    if (cameras[s] !== "") body[s] = Number(cameras[s]);
-  }
-  return body;
-}
-
-function buildHomographies() {
-  const h = {};
-  for (const s of ["1", "2", "3"]) {
-    if (homographies[s]) h[s] = homographies[s];
-  }
-  return h;
-}
 
 // Start grabber
 fetch("/api/grabber/start", {

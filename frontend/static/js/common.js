@@ -29,13 +29,44 @@ export function lsGet(k, fb) {
   return v !== undefined ? v : fb;
 }
 
-export function lsSet(k, v) {
-  _settings[k] = v;
+let _saveTimer = null;
+let _savePending = {};
+
+function _flushSettings() {
+  _saveTimer = null;
+  const body = _savePending;
+  _savePending = {};
   fetch("/api/settings", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ [k]: v }),
-  }).catch(e => console.warn("Settings save failed:", k, e));
+    body: JSON.stringify(body),
+  }).catch(e => console.warn("Settings save failed:", e));
+}
+
+export function lsSet(k, v) {
+  _settings[k] = v;
+  _savePending[k] = v;
+  if (!_saveTimer) _saveTimer = setTimeout(_flushSettings, 100);
+}
+
+/** Build camera slot → index mapping for API requests. */
+export function buildCameraBody() {
+  const cams = lsGet(LS.CAMS, { 1: "", 2: "", 3: "" });
+  const body = {};
+  for (const s of ["1", "2", "3"]) {
+    if (cams[s] !== "") body[s] = Number(cams[s]);
+  }
+  return body;
+}
+
+/** Build homography mapping for API requests. */
+export function buildHomographies() {
+  const hs = lsGet(LS.H, {});
+  const h = {};
+  for (const s of ["1", "2", "3"]) {
+    if (hs[s]) h[s] = hs[s];
+  }
+  return h;
 }
 
 export function loadImg(url) {
