@@ -27,6 +27,7 @@ const state = {
   turnStartScore: 0,    // score at start of current turn (for bust revert)
   gameOver: false,
   busted: false,
+  waitingForClear: false, // true until board is confirmed empty at game start
   history: [],          // [{player, darts: [{label, score}...], total, remaining, busted}]
 };
 
@@ -55,14 +56,16 @@ function initGame() {
   state.turnStartScore = config.target;
   state.gameOver = false;
   state.busted = false;
+  state.waitingForClear = true;
   state.history = [];
   renderScoreboard();
   renderTurn();
   renderBoard();
   renderHistory();
-  setStatus("Throw your darts...");
+  setStatus("Checking board...");
   $("#win-overlay").hidden = true;
   btnNext.disabled = true;
+  btnMiss.disabled = true;
 }
 
 /* ── DOM refs ── */
@@ -185,7 +188,7 @@ function renderHistory() {
 /* ── Score application ── */
 
 function applyDart(dart) {
-  if (state.turnDarts.length >= 3 || state.gameOver || state.busted) return;
+  if (state.turnDarts.length >= 3 || state.gameOver || state.busted || state.waitingForClear) return;
 
   state.turnDarts.push(dart);
   const pIdx = state.currentPlayer;
@@ -333,7 +336,7 @@ function hitTest(nx, ny) {
 }
 
 boardCanvas.addEventListener("pointerdown", e => {
-  if (state.gameOver) return;
+  if (state.gameOver || state.waitingForClear) return;
   const p = boardCoords(e);
   const hit = hitTest(p.x, p.y);
 
@@ -439,6 +442,19 @@ async function pollResult() {
 
 function handleDetectionResult(result) {
   const darts = result.keypoints.filter(kp => kp.confidence >= CONFIDENCE_THRESHOLD);
+
+  // Waiting for empty board at game start
+  if (state.waitingForClear) {
+    if (darts.length === 0) {
+      state.waitingForClear = false;
+      setStatus("Throw your darts...");
+      btnMiss.disabled = false;
+      fetch("/api/grabber/baseline", { method: "POST" }).catch(() => {});
+    } else {
+      setStatus("Remove darts from board to start");
+    }
+    return;
+  }
 
   // Board cleared (0 darts) after turn complete or bust → advance
   if (darts.length === 0 && (state.turnDarts.length >= 3 || state.busted)) {
