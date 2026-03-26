@@ -83,6 +83,30 @@ main {
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
 }
 
+/* Waiting overlay (board clear check at game start) */
+
+.board-wrap.is-waiting::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 2;
+}
+
+.board-wrap.is-waiting::before {
+  content: "";
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 40px; height: 40px;
+  margin: -20px 0 0 -20px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-top-color: var(--accent);
+  animation: spinner 0.8s linear infinite;
+  z-index: 3;
+}
+
+@keyframes spinner { to { transform: rotate(360deg); } }
+
 .board-img {
   width: 100%; height: 100%;
   display: block;
