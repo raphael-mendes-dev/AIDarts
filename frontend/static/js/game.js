@@ -129,7 +129,6 @@ function renderBoard() {
     const x = d.x_norm * sz;
     const y = d.y_norm * sz;
 
-    // Soft glow
     ctx.save();
     ctx.shadowColor = DART_GLOW;
     ctx.shadowBlur = 10;
@@ -139,7 +138,6 @@ function renderBoard() {
     ctx.fill();
     ctx.restore();
 
-    // Crisp border
     ctx.strokeStyle = "rgba(0,0,0,0.4)";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
@@ -194,13 +192,11 @@ function applyDart(dart) {
   const pIdx = state.currentPlayer;
   const newScore = state.scores[pIdx] - dart.score;
 
-  // Bust check
   if (newScore < 0 || (config.checkout === "double" && newScore === 1)) {
     bust();
     return;
   }
 
-  // Double out: must finish on a double (or bull)
   if (newScore === 0 && config.checkout === "double" && dart.multiplier !== 2) {
     bust();
     return;
@@ -210,14 +206,11 @@ function applyDart(dart) {
   renderScoreboard();
   renderTurn();
   renderBoard();
-
-  // Win check
   if (newScore === 0) {
     win(pIdx);
     return;
   }
 
-  // After 3 darts, prompt to wait for board clear
   if (state.turnDarts.length >= 3) {
     setStatus("Remove darts from board...");
     btnNext.disabled = false;
@@ -256,7 +249,7 @@ function win(playerIdx) {
 }
 
 function nextPlayer() {
-  recordTurn(state.busted);
+  if (state.turnDarts.length > 0) recordTurn(state.busted);
   state.currentPlayer = (state.currentPlayer + 1) % config.players;
   state.turnDarts = [];
   state.turnStartScore = state.scores[state.currentPlayer];
@@ -324,9 +317,8 @@ function boardCoords(e) {
   return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
 }
 
-function hitTest(nx, ny) {
-  const r = boardCanvas.getBoundingClientRect();
-  const thresh = HIT_RADIUS / r.width;
+function hitTest(nx, ny, rect) {
+  const thresh = HIT_RADIUS / rect.width;
   for (let i = 0; i < state.turnDarts.length; i++) {
     const d = state.turnDarts[i];
     if (d.x_norm < 0) continue; // miss (off-board)
@@ -337,8 +329,9 @@ function hitTest(nx, ny) {
 
 boardCanvas.addEventListener("pointerdown", e => {
   if (state.gameOver || state.waitingForClear) return;
-  const p = boardCoords(e);
-  const hit = hitTest(p.x, p.y);
+  const rect = boardCanvas.getBoundingClientRect();
+  const p = { x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height };
+  const hit = hitTest(p.x, p.y, rect);
 
   if (hit >= 0) {
     _drag = { idx: hit, startX: e.clientX, startY: e.clientY, moved: false };
@@ -470,7 +463,6 @@ function handleDetectionResult(result) {
 
   if (darts.length === 0) return;
 
-  // Replace entire turn with all detected keypoints
   state.turnDarts = darts.map(kp => ({
     label: kp.label, score: kp.score,
     multiplier: kp.multiplier, segment: kp.segment,
