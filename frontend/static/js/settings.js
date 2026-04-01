@@ -14,12 +14,12 @@ const ANCHOR_MOVE_THRESHOLD = 0.002;
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-function isFinite2(p) { return Array.isArray(p) && p.length === 2 && Number.isFinite(p[0]) && Number.isFinite(p[1]); }
+function isValidPoint(p) { return Array.isArray(p) && p.length === 2 && Number.isFinite(p[0]) && Number.isFinite(p[1]); }
 
 function cloneAnchors(a) {
   if (!a) return null;
   const o = {};
-  for (const k of HANDLE_KEYS) { if (!isFinite2(a[k])) return null; o[k] = [a[k][0], a[k][1]]; }
+  for (const k of HANDLE_KEYS) { if (!isValidPoint(a[k])) return null; o[k] = [a[k][0], a[k][1]]; }
   return o;
 }
 

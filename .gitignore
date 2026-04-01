@@ -4,3 +4,7 @@ __pycache__/
 CLAUDE.md
 models/*.onnx
 data/
+.DS_Store
+.idea/
+.vscode/
+*.log

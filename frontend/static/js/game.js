@@ -39,6 +39,8 @@ const _R = 225.5;
 const RINGS = { bull: 6.35/_R, outerBull: 15.9/_R, triIn: 99/_R, triOut: 107/_R, dblIn: 162/_R, dblOut: 170/_R };
 const SECTORS = [20,1,18,4,13,6,10,15,2,17,3,19,7,16,8,11,14,9,12,5];
 
+// Mirrors backend/scorer.py — kept client-side for instant UI feedback without a round-trip.
+// If scoring geometry changes, update both.
 function scoreDart(xn, yn) {
   const dx = (xn - 0.5) * 2, dy = (yn - 0.5) * 2;
   const r = Math.hypot(dx, dy);
