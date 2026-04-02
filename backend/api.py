@@ -9,7 +9,7 @@ from typing import Any, Literal
 import cv2
 import numpy as np
 from fastapi import APIRouter, Body, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from PIL import Image
 from pydantic import BaseModel
 
@@ -22,6 +22,15 @@ CAMERA_PROBE_MAX = 10
 JPEG_QUALITY = 90
 MODEL_PATH = Path(__file__).resolve().parent.parent / "models" / "dart_keypoints.onnx"
 SETTINGS_PATH = Path(__file__).resolve().parent.parent / "data" / "settings.json"
+
+# Change detection on warped frames (max per-camera diff vs held reference).
+# Noise: ~1.1-1.3 per cam. Dart landing: persistent 3-7 (accumulates per dart).
+DIFF_MOTION_THRESHOLD = 2.0
+RECHECK_INTERVAL = 3.0  # seconds — periodic re-detection when darts are on the board
+
+# Each camera capture thread runs at this rate; surplus frames are dropped.
+_CAM_FPS = 15
+_CAM_INTERVAL = 1.0 / _CAM_FPS
 
 # ── Device settings (persisted to data/settings.json) ──
 
@@ -54,11 +63,6 @@ def save_settings(body: dict[str, Any] = Body()):
         _write_settings(data)
     return {"ok": True}
 
-# Change detection on warped frames (max per-camera diff vs held reference).
-# Noise: ~1.1-1.3 per cam. Dart landing: persistent 3-7 (accumulates per dart).
-DIFF_MOTION_THRESHOLD = 2.0
-RECHECK_INTERVAL = 3.0  # seconds — periodic re-detection when darts are on the board
-
 
 # ── Detector (pre-loaded at startup) ──
 
@@ -79,7 +83,7 @@ _detector = _load_detector()
 # ── Helpers ──
 
 def _capture_frame(index: int) -> np.ndarray:
-    """Open camera, grab one frame, release. Sequential-safe for USB hubs."""
+    """Open camera, grab one frame, release. Fallback when grabber not running."""
     cap = cv2.VideoCapture(index)
     try:
         if not cap.isOpened():
@@ -157,15 +161,118 @@ def _run_detection(processed: list[np.ndarray], t_start: float, capture_ms: floa
     }
 
 
+# ── FrameSlot: latest-wins buffer with Condition ──
+
+class FrameSlot:
+    """Latest-wins frame buffer backed by threading.Condition.
+
+    Stores both raw JPEG bytes (for MJPEG streaming passthrough) and a decoded
+    numpy array (for OpenCV processing). Every waiting consumer is woken
+    immediately when a new frame arrives — no missed-frame race.
+    """
+
+    def __init__(self):
+        self._cond = threading.Condition(threading.Lock())
+        self._frame: bytes | None = None
+        self._arr: np.ndarray | None = None
+        self._seq: int = 0
+
+    def put(self, data: bytes) -> None:
+        arr = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
+        with self._cond:
+            self._frame = data
+            self._arr = arr
+            self._seq += 1
+            self._cond.notify_all()
+
+    def get_bytes(self, last_seq: int, timeout: float = 2.0) -> tuple[bytes | None, int]:
+        """Block until seq advances past last_seq. Returns (frame_bytes, new_seq)."""
+        deadline = time.monotonic() + timeout
+        with self._cond:
+            while self._seq == last_seq:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return None, last_seq
+                self._cond.wait(remaining)
+            return self._frame, self._seq
+
+    def get_array(self) -> np.ndarray | None:
+        with self._cond:
+            return self._arr.copy() if self._arr is not None else None
+
+
+# ── Per-camera capture thread ──
+
+class _CamThread(threading.Thread):
+    """Daemon thread that captures frames from one camera continuously.
+
+    Tries linuxpy (V4L2 direct access, MJPEG passthrough, works on aarch64)
+    first, then falls back to cv2 on platforms without V4L2 (Windows, macOS).
+    Frame rate is capped at _CAM_FPS; surplus frames are dropped before any
+    bytes copy, so backlog cannot accumulate.
+    """
+
+    def __init__(self, index: int, slot: FrameSlot, stop: threading.Event):
+        super().__init__(daemon=True)
+        self._index = index
+        self._slot = slot
+        self._stop = stop
+
+    def run(self) -> None:
+        try:
+            self._run_linuxpy()
+        except (ImportError, OSError) as exc:
+            log.debug("Camera %d linuxpy unavailable (%s), using cv2", self._index, exc)
+            self._run_cv2()
+
+    def _run_linuxpy(self) -> None:
+        from linuxpy.video.device import Device, VideoCapture, BufferType
+        path = f"/dev/video{self._index}"
+        with Device(path) as dev:
+            try:
+                dev.set_format(BufferType.VIDEO_CAPTURE, 640, 480, pixel_format="MJPG")
+            except Exception as exc:
+                log.debug("Camera %d set_format: %s", self._index, exc)
+            with VideoCapture(dev) as cap:
+                last = 0.0
+                for frame in cap:
+                    if self._stop.is_set():
+                        break
+                    now = time.monotonic()
+                    if now - last < _CAM_INTERVAL:
+                        continue  # drop frame before bytes() copy
+                    last = now
+                    self._slot.put(bytes(frame))
+
+    def _run_cv2(self) -> None:
+        cap = cv2.VideoCapture(self._index)
+        try:
+            last = 0.0
+            while not self._stop.is_set():
+                ret, frame = cap.read()
+                if not ret:
+                    time.sleep(0.05)
+                    continue
+                now = time.monotonic()
+                if now - last < _CAM_INTERVAL:
+                    continue
+                last = now
+                _, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
+                self._slot.put(buf.tobytes())
+        finally:
+            cap.release()
+
+
 # ── Background frame grabber with change detection ──
 
 class FrameGrabber:
     def __init__(self):
         self._cameras: list[int] = []
-        self._frames: dict[int, np.ndarray] = {}
-        self._lock = threading.Lock()
-        self._thread: threading.Thread | None = None
-        self._stop = threading.Event()
+        self._slots: dict[int, FrameSlot] = {}
+        self._cam_stops: dict[int, threading.Event] = {}
+        self._cam_threads: dict[int, _CamThread] = {}
+        self._detect_thread: threading.Thread | None = None
+        self._detect_stop = threading.Event()
         self._ref_frames: dict[int, np.ndarray] = {}
         self._change_pending = False
         self._auto_result: dict | None = None
@@ -178,34 +285,61 @@ class FrameGrabber:
     def start(self, camera_indexes: list[int]):
         self.stop()
         self._cameras = camera_indexes
-        self._frames.clear()
-        self._ref_frames = {}
         self._change_pending = False
         self._auto_result = None
         self._auto_result_id = 0
-        self._stop.clear()
-        self._thread = threading.Thread(target=self._loop, daemon=True)
-        self._thread.start()
+        self._detect_stop.clear()
+
+        for idx in camera_indexes:
+            slot = FrameSlot()
+            stop_ev = threading.Event()
+            thread = _CamThread(idx, slot, stop_ev)
+            self._slots[idx] = slot
+            self._cam_stops[idx] = stop_ev
+            self._cam_threads[idx] = thread
+            thread.start()
+
+        self._detect_thread = threading.Thread(target=self._detect_loop, daemon=True)
+        self._detect_thread.start()
         log.info("Frame grabber started for cameras %s", camera_indexes)
 
     def stop(self):
-        if self._thread and self._thread.is_alive():
-            self._stop.set()
-            self._thread.join(timeout=5)
-            log.info("Frame grabber stopped")
-        self._thread = None
-        self._frames.clear()
+        self._detect_stop.set()
+        if self._detect_thread and self._detect_thread.is_alive():
+            self._detect_thread.join(timeout=3)
+        self._detect_thread = None
+
+        for stop_ev in self._cam_stops.values():
+            stop_ev.set()
+        for thread in self._cam_threads.values():
+            thread.join(timeout=3)
+
+        self._slots.clear()
+        self._cam_stops.clear()
+        self._cam_threads.clear()
+        self._cameras = []
         self._ref_frames = {}
         self._auto_enabled = False
+        log.info("Frame grabber stopped")
 
     @property
     def running(self):
-        return self._thread is not None and self._thread.is_alive()
+        return bool(self._cam_threads) and any(t.is_alive() for t in self._cam_threads.values())
 
     def get_frame(self, index: int) -> np.ndarray | None:
-        with self._lock:
-            f = self._frames.get(index)
-            return f.copy() if f is not None else None
+        slot = self._slots.get(index)
+        return slot.get_array() if slot else None
+
+    def get_slot(self, index: int) -> FrameSlot | None:
+        return self._slots.get(index)
+
+    def get_cam_index(self, slot: int) -> int | None:
+        """Return device index for camera slot (1-based)."""
+        i = slot - 1
+        return self._cameras[i] if 0 <= i < len(self._cameras) else None
+
+    def set_homographies(self, homographies: dict[str, list]):
+        self._homographies = homographies
 
     def set_auto(self, enabled: bool, homographies: dict[str, list] | None = None):
         self._auto_enabled = enabled
@@ -229,27 +363,14 @@ class FrameGrabber:
         self._change_pending = False
         self._last_detect_count = 0
 
-    def _loop(self):
-        while not self._stop.is_set():
-            for idx in self._cameras:
-                if self._stop.is_set():
-                    break
-                cap = cv2.VideoCapture(idx)
-                try:
-                    if cap.isOpened():
-                        ret, frame = cap.read()
-                        if ret:
-                            with self._lock:
-                                self._frames[idx] = frame
-                finally:
-                    cap.release()
-
-            if self._auto_enabled and not self._stop.is_set():
+    def _detect_loop(self):
+        while not self._detect_stop.wait(timeout=0.1):
+            if self._auto_enabled:
                 self._check_change()
 
     def _check_change(self):
-        with self._lock:
-            frames = {k: v.copy() for k, v in self._frames.items()}
+        frames = {idx: slot.get_array() for idx, slot in self._slots.items()}
+        frames = {k: v for k, v in frames.items() if v is not None}
 
         if not frames:
             return
@@ -322,12 +443,31 @@ class FrameGrabber:
 
 _grabber = FrameGrabber()
 
+_MJPEG_BOUNDARY = b"frame"
+
 
 # ── Endpoints ──
 
 @router.get("/cameras")
 def list_cameras():
     _grabber.stop()
+    # Try linuxpy on Linux — auto-filters metadata-only /dev/videoN nodes
+    try:
+        from linuxpy.video.device import iter_video_capture_files, Device
+        cameras = []
+        for path in sorted(iter_video_capture_files()):
+            try:
+                with Device(path) as dev:
+                    name = dev.info.card
+                idx = int(str(path).replace("/dev/video", ""))
+                cameras.append({"index": idx, "name": name, "width": 0, "height": 0})
+            except (OSError, ValueError):
+                pass
+        return {"cameras": cameras}
+    except ImportError:
+        pass
+
+    # Fallback: cv2 probe (Windows / non-V4L2 systems)
     cameras = []
     for i in range(CAMERA_PROBE_MAX):
         cap = cv2.VideoCapture(i)
@@ -353,6 +493,45 @@ def snapshot(index: int, img_format: Literal["jpg", "png"] = "jpg"):
         return Response(content=buf.tobytes(), media_type="image/png")
     _, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
     return Response(content=buf.tobytes(), media_type="image/jpeg")
+
+
+@router.get("/stream/{slot}")
+def stream_camera(slot: int):
+    """Live MJPEG stream for camera slot 1/2/3 with homography applied when set."""
+    if not (1 <= slot <= 3):
+        raise HTTPException(400, "Slot must be 1, 2 or 3")
+    cam_idx = _grabber.get_cam_index(slot)
+    if cam_idx is None:
+        raise HTTPException(404, "Camera slot not running")
+    raw_slot = _grabber.get_slot(cam_idx)
+    if raw_slot is None:
+        raise HTTPException(404, "Stream not available")
+
+    def generate():
+        seq = 0
+        while True:
+            frame_bytes, seq = raw_slot.get_bytes(seq, timeout=2.0)
+            if frame_bytes is None:
+                continue
+            H = _grabber._homographies.get(str(slot))
+            if H:
+                arr = raw_slot.get_array()
+                if arr is not None:
+                    warped = _warp_crop_mask(arr, H)
+                    _, buf = cv2.imencode(".jpg", warped, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
+                    frame_bytes = buf.tobytes()
+            yield (
+                b"--" + _MJPEG_BOUNDARY + b"\r\n"
+                b"Content-Type: image/jpeg\r\n\r\n"
+                + frame_bytes
+                + b"\r\n"
+            )
+
+    return StreamingResponse(
+        generate(),
+        media_type=f"multipart/x-mixed-replace; boundary={_MJPEG_BOUNDARY.decode()}",
+        headers={"Cache-Control": "no-cache, no-store", "X-Accel-Buffering": "no"},
+    )
 
 
 class CameraSet(BaseModel):
@@ -392,6 +571,17 @@ class AutoDetectRequest(BaseModel):
 def grabber_auto(req: AutoDetectRequest):
     _grabber.set_auto(req.enabled, req.homographies)
     return {"auto": req.enabled}
+
+
+class HomographyUpdate(BaseModel):
+    homographies: dict[str, list]
+
+
+@router.post("/grabber/homographies")
+def update_homographies(req: HomographyUpdate):
+    """Update streaming homographies without changing auto-detect state."""
+    _grabber.set_homographies(req.homographies)
+    return {"ok": True}
 
 
 @router.post("/grabber/baseline")

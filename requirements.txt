@@ -5,3 +5,4 @@ onnxruntime>=1.17
 numpy
 Pillow
 scipy
+linuxpy>=0.24.0

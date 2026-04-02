@@ -102,6 +102,37 @@ let previews  = {};
 let originals = {};
 let fusionVer = 0;
 
+/* ── Grabber / stream helpers ── */
+
+function pushHomographies() {
+  const h = {};
+  for (const s of ["1", "2", "3"]) { if (storedH[s]) h[s] = storedH[s]; }
+  fetch("/api/grabber/homographies", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ homographies: h }),
+  }).catch(e => console.warn("Homography push failed:", e));
+}
+
+async function startGrabber() {
+  const cams = {};
+  for (const s of [1, 2, 3]) { if (assign[s] !== "") cams[String(s)] = Number(assign[s]); }
+  if (!Object.keys(cams).length) return;
+  try {
+    await fetch("/api/grabber/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cameras: cams }),
+    });
+  } catch (e) { console.warn("Grabber start:", e); }
+}
+
+function setTileStream(slot) {
+  const img = $(`#img-${slot}`);
+  img.src = "";
+  img.src = `/api/stream/${slot}`;
+}
+
 const modal = {
   open: false, slot: null, anchors: null,
   dragging: "", pointerId: null, handleEl: null,
@@ -163,19 +194,38 @@ function populateSelects() {
 }
 
 selects.forEach((sel, i) => {
-  sel.addEventListener("change", () => { assign[i+1] = sel.value; lsSet(LS.CAMS, assign); if (sel.value) loadPreview(i+1); else clearPreview(i+1); });
+  sel.addEventListener("change", async () => {
+    assign[i+1] = sel.value;
+    lsSet(LS.CAMS, assign);
+    if (sel.value) {
+      await startGrabber();
+      await loadPreview(i+1);
+      // Refresh all stream srcs after grabber restart
+      for (const s of [1, 2, 3]) { if (assign[s] !== "") setTileStream(s); }
+      pushHomographies();
+    } else {
+      clearPreview(i+1);
+    }
+  });
 });
 
 async function loadPreview(slot) {
   const idx = assign[slot]; if (idx === "") return;
-  const tile = $(`#tile-${slot}`); tile.classList.add("is-busy");
+  const tile = $(`#tile-${slot}`);
+
+  // Live stream in the tile — shows homography-corrected view once grabber runs
+  setTileStream(slot);
+  tile.classList.add("is-live");
+
+  // Static snapshot for calibration source and fusion canvas
+  tile.classList.add("is-busy");
   try {
     const r = await fetch(`/api/cameras/${idx}/snapshot`);
     if (!r.ok) return;
     const blob = await r.blob();
     const url = URL.createObjectURL(blob);
     const img = await loadImg(url);
-    tile.classList.remove("is-busy"); tile.classList.add("is-live");
+    tile.classList.remove("is-busy");
     revokeOriginal(slot);
     originals[slot] = { url, img };
     if (storedH[slot]) {
@@ -206,7 +256,7 @@ function applyTotalH(slot, cb) {
 function setPreviewEverywhere(slot, url, img) {
   revokePreview(slot);
   previews[slot] = { url, img };
-  $(`#img-${slot}`).src = url;
+  // Tile #img-{slot} keeps its live stream src — only thumb gets the static snapshot
   $(`#tile-${slot}`).classList.add("is-live");
   setThumb(slot, url);
 }
@@ -227,11 +277,12 @@ function setThumb(slot, url) {
   const i = document.createElement("img"); i.src = url; t.appendChild(i);
 }
 
-// USB cameras on a hub fail if opened concurrently
 (async () => {
-  for (const s of [1, 2, 3]) {
-    if (assign[s] !== "") await loadPreview(s);
-  }
+  const assigned = [1, 2, 3].filter(s => assign[s] !== "");
+  if (!assigned.length) return;
+  await startGrabber();
+  await Promise.all(assigned.map(s => loadPreview(s)));
+  pushHomographies();
 })();
 
 /* ── 3. Calibration Modal ── */
@@ -373,6 +424,7 @@ $("#btn-reset").addEventListener("click", async () => {
 
   delete storedH[slot];
   lsSet(LS.H, storedH);
+  pushHomographies();
   delete calibSave[slot];
   lsSet(LS.CAL, calibSave);
 
@@ -434,6 +486,7 @@ function applyRotation(degrees) {
   if (!Htotal) return;
   storedH[slot] = Htotal;
   lsSet(LS.H, storedH);
+  pushHomographies();
   applyTotalH(slot, () => {
     modalImg.src = previews[slot].url;
     const L = getLayout();
@@ -529,6 +582,7 @@ function applyWarp() {
 
   storedH[slot] = Htotal;
   lsSet(LS.H, storedH);
+  pushHomographies();
   applyTotalH(slot, () => {
     modalImg.src = previews[slot].url;
     modal.anchors = defaultAnchors(getLayout() || L);
